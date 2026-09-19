@@ -187,9 +187,9 @@
   function setAvatarFace(face, member, style) {
     face.replaceChildren();
 
-    if (member.avatarImage) {
+    if (member.avatarImageUrl) {
       const image = document.createElement("img");
-      image.src = member.avatarImage;
+      image.src = member.avatarImageUrl;
       image.alt = "";
       image.loading = "lazy";
       image.decoding = "async";
