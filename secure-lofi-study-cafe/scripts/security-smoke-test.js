@@ -2,41 +2,27 @@
 
 const fs = require("fs");
 const path = require("path");
-const sqlite3 = require("sqlite3").verbose();
 
-const schema = fs.readFileSync(
-  path.join(__dirname, "..", "schema.sql"),
-  "utf8"
+const testDatabasePath = path.join(
+  __dirname,
+  "..",
+  "security-smoke.db"
 );
 
-const db = new sqlite3.Database(":memory:");
-
-function exec(sql) {
-  return new Promise((resolve, reject) => {
-    db.exec(sql, (err) => (err ? reject(err) : resolve()));
-  });
+for (const suffix of ["", "-wal", "-shm"]) {
+  try {
+    fs.rmSync(testDatabasePath + suffix, { force: true });
+  } catch {}
 }
 
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(this);
-      }
-    });
-  });
-}
+process.env.TURSO_DATABASE_URL = "file:security-smoke.db";
+delete process.env.TURSO_AUTH_TOKEN;
+delete process.env.NODE_ENV;
 
-function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
-  });
-}
+const db = require("../database");
 
 async function main() {
-  await exec(schema);
+  await db.ready;
 
   const requiredTables = new Set([
     "users",
@@ -48,7 +34,7 @@ async function main() {
     "sessions"
   ]);
 
-  const tables = await all(
+  const tables = await db.all(
     "SELECT name FROM sqlite_master WHERE type = 'table'"
   );
 
@@ -68,7 +54,7 @@ async function main() {
     "idx_sessions_expires_at"
   ]);
 
-  const indexes = await all(
+  const indexes = await db.all(
     "SELECT name FROM sqlite_master WHERE type = 'index'"
   );
 
@@ -78,28 +64,36 @@ async function main() {
     }
   }
 
-  await run(
+  await db.run(
     `
     INSERT INTO sessions (sid, sess, expires_at)
     VALUES (?, ?, ?)
     `,
     [
       "smoke-session",
-      JSON.stringify({ user: { id: 1, username: "admin", role: "admin" } }),
+      JSON.stringify({
+        user: {
+          id: 1,
+          username: "admin",
+          role: "admin"
+        }
+      }),
       Date.now() + 60_000
     ]
   );
 
-  const sessionRows = await all(
+  const session = await db.get(
     "SELECT sid, expires_at FROM sessions WHERE sid = ?",
     ["smoke-session"]
   );
 
-  if (sessionRows.length !== 1 || sessionRows[0].sid !== "smoke-session") {
-    throw new Error("Persistent session table verification failed.");
+  if (!session || session.sid !== "smoke-session") {
+    throw new Error(
+      "Turso/libSQL session persistence verification failed."
+    );
   }
 
-  await run(
+  await db.run(
     `
     INSERT INTO security_events (
       event_uuid,
@@ -127,25 +121,28 @@ async function main() {
     ]
   );
 
-  const rows = await all(
+  const row = await db.get(
     `
     SELECT event_type, severity, outcome
     FROM security_events
     WHERE severity = ?
     ORDER BY created_at DESC
+    LIMIT 1
     `,
     ["WARNING"]
   );
 
   if (
-    rows.length !== 1 ||
-    rows[0].event_type !== "auth.login_failed" ||
-    rows[0].outcome !== "failed"
+    !row ||
+    row.event_type !== "auth.login_failed" ||
+    row.outcome !== "failed"
   ) {
-    throw new Error("Security event insert/query verification failed.");
+    throw new Error(
+      "Security event insert/query verification failed."
+    );
   }
 
-  const queryPlan = await all(
+  const queryPlan = await db.all(
     `
     EXPLAIN QUERY PLAN
     SELECT created_at, event_type, severity, outcome
@@ -157,16 +154,33 @@ async function main() {
   );
 
   if (!queryPlan.length) {
-    throw new Error("SQLite query-plan verification failed.");
+    throw new Error("libSQL query-plan verification failed.");
   }
 
-  console.log("Security schema smoke test passed.");
-  console.log(`Verified ${requiredTables.size} tables and ${requiredIndexes.size} indexes.`);
+  console.log("Security database smoke test passed.");
+  console.log(
+    `Verified ${requiredTables.size} tables and ${requiredIndexes.size} indexes using @libsql/client.`
+  );
+}
+
+async function cleanup() {
+  try {
+    await db.close();
+  } catch {}
+
+  for (const suffix of ["", "-wal", "-shm"]) {
+    try {
+      fs.rmSync(testDatabasePath + suffix, { force: true });
+    } catch {}
+  }
 }
 
 main()
-  .then(() => db.close())
-  .catch((err) => {
+  .then(async () => {
+    await cleanup();
+  })
+  .catch(async (err) => {
     console.error(err);
-    db.close(() => process.exit(1));
+    await cleanup();
+    process.exit(1);
   });
