@@ -20,6 +20,9 @@
     </div>
 
     <div class="topbar-actions">
+      <% if (canAssignTempAdmin) { %>
+        <a class="button primary small" href="/admin">Admin Console</a>
+      <% } %>
       <form method="post" action="/logout">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <button class="button secondary small" type="submit">Logout</button>
