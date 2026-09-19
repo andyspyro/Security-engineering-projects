@@ -1166,6 +1166,23 @@ function updateMemberStatus(userId, updates) {
    Routes
 ------------------------- */
 
+app.get("/healthz", async (req, res) => {
+  try {
+    const row = await db.get("SELECT 1 AS ok");
+    if (!row || row.ok !== 1) {
+      return res.status(503).json({ status: "unhealthy" });
+    }
+
+    res.status(200).json({
+      status: "ok",
+      database: "reachable"
+    });
+  } catch (err) {
+    console.error("Healthcheck database error:", err);
+    res.status(503).json({ status: "unhealthy" });
+  }
+});
+
 app.get("/", (req, res) => {
   if (req.session.user) {
     return res.redirect("/cafe");
