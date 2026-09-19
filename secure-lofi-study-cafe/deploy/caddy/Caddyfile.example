@@ -1,0 +1,20 @@
+# Replace cafe.example.com with a DNS name that points to your public IP.
+# Forward TCP 80 and 443 from the router to this server.
+#
+# Caddy terminates HTTPS and proxies WebSocket/HTTP traffic to the Node
+# application bound only to localhost.
+
+cafe.example.com {
+    encode zstd gzip
+
+    reverse_proxy 127.0.0.1:3000
+
+    log {
+        output file /var/log/caddy/secure-lofi-access.log {
+            roll_size 10MiB
+            roll_keep 10
+            roll_keep_for 168h
+        }
+        format json
+    }
+}
