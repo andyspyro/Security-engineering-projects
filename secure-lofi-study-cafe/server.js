@@ -11,8 +11,14 @@ const crypto = require("crypto");
 const { Server } = require("socket.io");
 const { body, validationResult } = require("express-validator");
 const db = require("./database");
+const SQLiteSessionStore = require("./sqlite-session-store");
 
 const app = express();
+
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -212,7 +218,21 @@ app.use(generalLimiter);
    Sessions
 ------------------------- */
 
+const sessionStore = new SQLiteSessionStore({
+  defaultTtlMs: 1000 * 60 * 60
+});
+
+const sessionCleanupTimer = setInterval(() => {
+  sessionStore
+    .clearExpired()
+    .catch((err) => console.error("Session cleanup error:", err));
+}, 15 * 60 * 1000);
+
+sessionCleanupTimer.unref();
+
 const sessionMiddleware = session({
+  store: sessionStore,
+  name: "lofi.sid",
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -1425,9 +1445,14 @@ app.get("/profile-image/:id", requireLogin, async (req, res) => {
   }
 });
 
-app.get("/security", (req, res) => {
-  res.render("security");
-});
+app.get(
+  "/security",
+  requireLogin,
+  requirePermanentAdmin,
+  (req, res) => {
+    res.render("security");
+  }
+);
 
 app.get("/cafe", requireLogin, async (req, res) => {
   try {
