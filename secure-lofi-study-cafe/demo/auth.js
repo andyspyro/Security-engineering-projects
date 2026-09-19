@@ -58,7 +58,27 @@
   function getAccounts() {
     try {
       const parsed = JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "[]");
-      return Array.isArray(parsed) ? parsed : [];
+      const accounts = Array.isArray(parsed) ? parsed : [];
+      let changed = false;
+
+      const normalized = accounts.map((account) => {
+        const isShowcaseAdmin =
+          String(account.username || "").toLowerCase() === SHOWCASE_ADMIN.username &&
+          account.showcase === true;
+
+        if (!isShowcaseAdmin && account.role !== "user") {
+          changed = true;
+          return { ...account, role: "user" };
+        }
+
+        return account;
+      });
+
+      if (changed) {
+        saveAccounts(normalized);
+      }
+
+      return normalized;
     } catch {
       return [];
     }
@@ -119,13 +139,18 @@
   }
 
   function startSession(account) {
-    logAudit(account, "auth.login", "Successful login");
+    const normalizedAccount =
+      String(account.username || "").toLowerCase() === SHOWCASE_ADMIN.username
+        ? { ...account, role: "admin" }
+        : { ...account, role: "user" };
+
+    logAudit(normalizedAccount, "auth.login", "Successful login");
 
     sessionStorage.setItem(
       SESSION_KEY,
       JSON.stringify({
-        username: account.username,
-        role: account.role
+        username: normalizedAccount.username,
+        role: normalizedAccount.role
       })
     );
 
