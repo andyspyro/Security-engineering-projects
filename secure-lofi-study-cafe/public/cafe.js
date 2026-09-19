@@ -7,7 +7,13 @@
   const canModerate = body.dataset.canModerate === "true";
   const canAssign = body.dataset.canAssign === "true";
 
-  const socket = io();
+  const socket = io({
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 5000,
+    timeout: 10000
+  });
 
   const chatLog = document.getElementById("chat-log");
   const chatForm = document.getElementById("chat-form");
@@ -974,14 +980,74 @@
     chatInput.value = "";
   });
 
+  function applyRoomSnapshot(snapshot) {
+    if (!snapshot) {
+      return;
+    }
+
+    renderMembers(snapshot.members || []);
+
+    if (snapshot.playerState) {
+      applyPlayerState(snapshot.playerState);
+    }
+
+    if (snapshot.vote) {
+      voteCount.textContent =
+        `${snapshot.vote.count}/${snapshot.vote.required}`;
+    }
+
+    if (snapshot.controller) {
+      controllerState = snapshot.controller;
+    }
+
+    if (canModerate && pendingList) {
+      renderPending(snapshot.pendingRequests || []);
+    }
+  }
+
+  function requestAuthoritativeRoomState() {
+    socket
+      .timeout(5000)
+      .emit("room:sync-request", (error, response) => {
+        if (error) {
+          socketStatus.textContent = "Sync retrying";
+          socketStatus.classList.remove("live");
+          return;
+        }
+
+        if (!response || !response.ok) {
+          socketStatus.textContent = "Sync failed";
+          socketStatus.classList.remove("live");
+          return;
+        }
+
+        applyRoomSnapshot(response.snapshot);
+        socketStatus.textContent = "Live";
+        socketStatus.classList.add("live");
+      });
+  }
+
   socket.on("connect", () => {
-    socketStatus.textContent = "Live";
-    socketStatus.classList.add("live");
+    socketStatus.textContent = "Syncing";
+    socketStatus.classList.remove("live");
+    requestAuthoritativeRoomState();
   });
 
   socket.on("disconnect", () => {
     socketStatus.textContent = "Reconnecting";
     socketStatus.classList.remove("live");
+  });
+
+  socket.on("connect_error", (error) => {
+    console.error("Realtime connection failed:", error.message);
+    socketStatus.textContent = "Connection failed";
+    socketStatus.classList.remove("live");
+  });
+
+  socket.on("room:snapshot", (snapshot) => {
+    applyRoomSnapshot(snapshot);
+    socketStatus.textContent = "Live";
+    socketStatus.classList.add("live");
   });
 
   socket.on("chat:new", (message) => {
