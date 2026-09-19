@@ -30,6 +30,9 @@
   const avatarStage = document.getElementById("avatar-stage");
   const avatarLayer = document.getElementById("avatar-layer");
   const floorMemberCount = document.getElementById("floor-member-count");
+  const profileImageInput = document.getElementById("profile-image-input");
+  const removeProfileImageButton = document.getElementById("remove-profile-image");
+  const profileImageStatus = document.getElementById("profile-image-status");
 
   let latestMembers = [];
   let player = null;
@@ -37,6 +40,19 @@
   let playerState = null;
   let controllerState = null;
   let followingRoom = true;
+
+  const speechBubbles = new Map();
+  const heldKeys = new Set();
+  let heldPointerVector = null;
+  let movementTarget = null;
+  let movementFrame = null;
+  let lastMovementTime = 0;
+  let lastMovementEmit = 0;
+  let isWalking = false;
+
+  const WALK_SPEED = 24;
+  const MOVE_EMIT_INTERVAL_MS = 90;
+  const PROFILE_IMAGE_MAX_BYTES = 512 * 1024;
 
   function addCsrf(form) {
     const input = document.createElement("input");
@@ -162,23 +178,92 @@
     return glyphs[style] || "☕";
   }
 
+  function currentMember() {
+    return latestMembers.find(
+      (candidate) => Number(candidate.id) === currentUserId
+    );
+  }
+
+  function setAvatarFace(face, member, style) {
+    face.replaceChildren();
+
+    if (member.avatarImage) {
+      const image = document.createElement("img");
+      image.src = member.avatarImage;
+      image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
+      face.appendChild(image);
+      face.classList.add("has-profile-image");
+    } else {
+      face.textContent = avatarGlyph(style);
+      face.classList.remove("has-profile-image");
+    }
+  }
+
+  function updateSpeechBubbleNode(avatar, member) {
+    const bubbleState = speechBubbles.get(member.username);
+    let bubble = avatar.querySelector(".avatar-speech");
+
+    if (!bubbleState || bubbleState.expiresAt <= Date.now()) {
+      if (bubble) {
+        bubble.remove();
+      }
+      if (bubbleState) {
+        speechBubbles.delete(member.username);
+      }
+      return;
+    }
+
+    if (!bubble) {
+      bubble = document.createElement("span");
+      bubble.className = "avatar-speech";
+      avatar.prepend(bubble);
+    }
+
+    bubble.textContent = bubbleState.text;
+  }
+
   function renderAvatars(members = []) {
     if (!avatarLayer) {
       return;
     }
 
-    avatarLayer.replaceChildren();
-
     if (floorMemberCount) {
       floorMemberCount.textContent = String(members.length);
     }
 
+    const activeIds = new Set();
+
     members.forEach((member) => {
-      const avatar = document.createElement("div");
+      const memberId = String(member.id);
+      activeIds.add(memberId);
+
       const style = member.avatarStyle || "latte";
       const isCurrent = Number(member.id) === currentUserId;
+      let avatar = avatarLayer.querySelector(
+        `[data-user-id="${memberId}"]`
+      );
 
-      avatar.className = `room-avatar avatar-${style}${isCurrent ? " is-you" : ""}`;
+      if (!avatar) {
+        avatar = document.createElement("div");
+        avatar.dataset.userId = memberId;
+
+        const face = document.createElement("span");
+        face.className = "avatar-face";
+
+        const label = document.createElement("span");
+        label.className = "avatar-name";
+
+        const state = document.createElement("span");
+        state.className = "avatar-state-dot";
+
+        avatar.append(face, label, state);
+        avatarLayer.appendChild(avatar);
+      }
+
+      avatar.className =
+        `room-avatar avatar-${style}${isCurrent ? " is-you" : ""}${isCurrent && isWalking ? " is-walking" : ""}`;
       avatar.style.left = `${Number(member.avatarX || 50)}%`;
       avatar.style.top = `${Number(member.avatarY || 50)}%`;
       avatar.setAttribute(
@@ -186,16 +271,17 @@
         `${member.username}${isCurrent ? ", your avatar" : ""}`
       );
 
-      const face = document.createElement("span");
-      face.className = "avatar-face";
-      face.textContent = avatarGlyph(style);
+      const face = avatar.querySelector(".avatar-face");
+      const label = avatar.querySelector(".avatar-name");
+      const state = avatar.querySelector(".avatar-state-dot");
 
-      const label = document.createElement("span");
-      label.className = "avatar-name";
-      label.textContent = isCurrent ? `${member.username} · you` : member.username;
+      setAvatarFace(face, member, style);
+      label.textContent = isCurrent
+        ? `${member.username} · you`
+        : member.username;
 
-      const state = document.createElement("span");
       state.className = "avatar-state-dot";
+
       if (member.isController) {
         state.classList.add("controller");
         state.title = "Room controller";
@@ -206,49 +292,182 @@
         state.title = "Online";
       }
 
-      avatar.append(face, label, state);
-      avatarLayer.appendChild(avatar);
+      updateSpeechBubbleNode(avatar, member);
+    });
+
+    avatarLayer.querySelectorAll(".room-avatar").forEach((avatar) => {
+      if (!activeIds.has(avatar.dataset.userId)) {
+        avatar.remove();
+      }
     });
   }
 
-  function moveCurrentAvatar(dx, dy) {
-    const member = latestMembers.find(
-      (candidate) => Number(candidate.id) === currentUserId
-    );
+  function setSpeechBubble(username, message) {
+    const cleanText = String(message || "").trim().slice(0, 120);
+
+    if (!username || !cleanText) {
+      return;
+    }
+
+    const expiresAt = Date.now() + 5000;
+    speechBubbles.set(username, { text: cleanText, expiresAt });
+    renderAvatars(latestMembers);
+
+    setTimeout(() => {
+      const current = speechBubbles.get(username);
+      if (current && current.expiresAt === expiresAt) {
+        speechBubbles.delete(username);
+        renderAvatars(latestMembers);
+      }
+    }, 5100);
+  }
+
+  function setLocalAvatarPosition(x, y, emitNow = false) {
+    const member = currentMember();
 
     if (!member) {
       return;
     }
 
-    member.avatarX = Math.min(92, Math.max(8, Number(member.avatarX || 50) + dx));
-    member.avatarY = Math.min(92, Math.max(8, Number(member.avatarY || 50) + dy));
+    member.avatarX = Math.min(92, Math.max(8, Number(x)));
+    member.avatarY = Math.min(92, Math.max(8, Number(y)));
 
-    renderAvatars(latestMembers);
+    const avatar = avatarLayer
+      ? avatarLayer.querySelector(`[data-user-id="${currentUserId}"]`)
+      : null;
 
-    socket.emit("member:move", {
-      x: member.avatarX,
-      y: member.avatarY
-    });
+    if (avatar) {
+      avatar.style.left = `${member.avatarX}%`;
+      avatar.style.top = `${member.avatarY}%`;
+      avatar.classList.toggle("is-walking", isWalking);
+    }
+
+    const now = performance.now();
+
+    if (
+      emitNow ||
+      now - lastMovementEmit >= MOVE_EMIT_INTERVAL_MS
+    ) {
+      lastMovementEmit = now;
+      socket.emit("member:move", {
+        x: member.avatarX,
+        y: member.avatarY
+      });
+    }
   }
 
-  function moveCurrentAvatarTo(x, y) {
-    const member = latestMembers.find(
-      (candidate) => Number(candidate.id) === currentUserId
-    );
+  function movementDirection() {
+    let x = 0;
+    let y = 0;
+
+    if (heldKeys.has("ArrowLeft") || heldKeys.has("a") || heldKeys.has("A")) x -= 1;
+    if (heldKeys.has("ArrowRight") || heldKeys.has("d") || heldKeys.has("D")) x += 1;
+    if (heldKeys.has("ArrowUp") || heldKeys.has("w") || heldKeys.has("W")) y -= 1;
+    if (heldKeys.has("ArrowDown") || heldKeys.has("s") || heldKeys.has("S")) y += 1;
+
+    if (heldPointerVector) {
+      x += heldPointerVector.x;
+      y += heldPointerVector.y;
+    }
+
+    if (x === 0 && y === 0) {
+      return null;
+    }
+
+    const length = Math.hypot(x, y) || 1;
+    return { x: x / length, y: y / length };
+  }
+
+  function stopWalking() {
+    const wasWalking = isWalking;
+    isWalking = false;
+    movementFrame = null;
+    lastMovementTime = 0;
+
+    const avatar = avatarLayer
+      ? avatarLayer.querySelector(`[data-user-id="${currentUserId}"]`)
+      : null;
+
+    if (avatar) {
+      avatar.classList.remove("is-walking");
+    }
+
+    if (wasWalking) {
+      const member = currentMember();
+      if (member) {
+        setLocalAvatarPosition(member.avatarX, member.avatarY, true);
+      }
+    }
+  }
+
+  function movementStep(now) {
+    const member = currentMember();
 
     if (!member) {
+      stopWalking();
       return;
     }
 
-    member.avatarX = Math.min(92, Math.max(8, x));
-    member.avatarY = Math.min(92, Math.max(8, y));
+    if (!lastMovementTime) {
+      lastMovementTime = now;
+    }
 
-    renderAvatars(latestMembers);
+    const deltaSeconds = Math.min(0.05, (now - lastMovementTime) / 1000);
+    lastMovementTime = now;
 
-    socket.emit("member:move", {
-      x: member.avatarX,
-      y: member.avatarY
-    });
+    const direction = movementDirection();
+    let nextX = Number(member.avatarX || 50);
+    let nextY = Number(member.avatarY || 50);
+    let active = false;
+
+    if (direction) {
+      movementTarget = null;
+      nextX += direction.x * WALK_SPEED * deltaSeconds;
+      nextY += direction.y * WALK_SPEED * deltaSeconds;
+      active = true;
+    } else if (movementTarget) {
+      const dx = movementTarget.x - nextX;
+      const dy = movementTarget.y - nextY;
+      const distance = Math.hypot(dx, dy);
+
+      if (distance <= 0.45) {
+        nextX = movementTarget.x;
+        nextY = movementTarget.y;
+        movementTarget = null;
+      } else {
+        const step = Math.min(distance, WALK_SPEED * deltaSeconds);
+        nextX += (dx / distance) * step;
+        nextY += (dy / distance) * step;
+        active = true;
+      }
+    }
+
+    if (!active && !movementTarget) {
+      setLocalAvatarPosition(nextX, nextY, true);
+      stopWalking();
+      return;
+    }
+
+    isWalking = true;
+    setLocalAvatarPosition(nextX, nextY);
+    movementFrame = requestAnimationFrame(movementStep);
+  }
+
+  function ensureMovementLoop() {
+    if (movementFrame) {
+      return;
+    }
+
+    lastMovementTime = 0;
+    movementFrame = requestAnimationFrame(movementStep);
+  }
+
+  function walkTo(x, y) {
+    movementTarget = {
+      x: Math.min(92, Math.max(8, Number(x))),
+      y: Math.min(92, Math.max(8, Number(y)))
+    };
+    ensureMovementLoop();
   }
 
   function setCurrentAvatarStyle(style) {
@@ -258,9 +477,7 @@
       return;
     }
 
-    const member = latestMembers.find(
-      (candidate) => Number(candidate.id) === currentUserId
-    );
+    const member = currentMember();
 
     if (member) {
       member.avatarStyle = style;
@@ -589,52 +806,62 @@
       const bounds = avatarStage.getBoundingClientRect();
       const x = ((event.clientX - bounds.left) / bounds.width) * 100;
       const y = ((event.clientY - bounds.top) / bounds.height) * 100;
-      moveCurrentAvatarTo(x, y);
+
+      walkTo(x, y);
       avatarStage.focus();
     });
 
     avatarStage.addEventListener("keydown", (event) => {
-      const moves = {
-        ArrowUp: [0, -5],
-        ArrowDown: [0, 5],
-        ArrowLeft: [-5, 0],
-        ArrowRight: [5, 0],
-        w: [0, -5],
-        W: [0, -5],
-        s: [0, 5],
-        S: [0, 5],
-        a: [-5, 0],
-        A: [-5, 0],
-        d: [5, 0],
-        D: [5, 0]
-      };
+      const allowed = [
+        "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+        "w", "W", "a", "A", "s", "S", "d", "D"
+      ];
 
-      const move = moves[event.key];
-
-      if (!move) {
+      if (!allowed.includes(event.key)) {
         return;
       }
 
       event.preventDefault();
-      moveCurrentAvatar(move[0], move[1]);
+      heldKeys.add(event.key);
+      movementTarget = null;
+      ensureMovementLoop();
+    });
+
+    avatarStage.addEventListener("blur", () => {
+      heldKeys.clear();
     });
   }
 
-  document.querySelectorAll("[data-move]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const direction = button.dataset.move;
-      const moves = {
-        up: [0, -5],
-        down: [0, 5],
-        left: [-5, 0],
-        right: [5, 0]
-      };
+  document.addEventListener("keyup", (event) => {
+    if (heldKeys.delete(event.key) && heldKeys.size === 0 && !heldPointerVector) {
+      ensureMovementLoop();
+    }
+  });
 
-      const move = moves[direction];
-      if (move) {
-        moveCurrentAvatar(move[0], move[1]);
-      }
+  document.querySelectorAll("[data-move]").forEach((button) => {
+    const vectors = {
+      up: { x: 0, y: -1 },
+      down: { x: 0, y: 1 },
+      left: { x: -1, y: 0 },
+      right: { x: 1, y: 0 }
+    };
+
+    button.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      heldPointerVector = vectors[button.dataset.move] || null;
+      movementTarget = null;
+      button.setPointerCapture?.(event.pointerId);
+      ensureMovementLoop();
     });
+
+    const release = () => {
+      heldPointerVector = null;
+      ensureMovementLoop();
+    };
+
+    button.addEventListener("pointerup", release);
+    button.addEventListener("pointercancel", release);
+    button.addEventListener("lostpointercapture", release);
   });
 
   document.querySelectorAll("[data-avatar-style]").forEach((button) => {
@@ -642,6 +869,76 @@
       setCurrentAvatarStyle(button.dataset.avatarStyle);
     });
   });
+
+  if (profileImageInput) {
+    profileImageInput.addEventListener("change", () => {
+      const file = profileImageInput.files && profileImageInput.files[0];
+
+      if (!file) {
+        return;
+      }
+
+      const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+
+      if (!allowedTypes.includes(file.type)) {
+        profileImageStatus.textContent = "Use PNG, JPEG, or WebP.";
+        profileImageInput.value = "";
+        return;
+      }
+
+      if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+        profileImageStatus.textContent = "Image must be 512 KB or smaller.";
+        profileImageInput.value = "";
+        return;
+      }
+
+      profileImageStatus.textContent = "Uploading…";
+
+      const reader = new FileReader();
+
+      reader.addEventListener("load", () => {
+        socket.emit(
+          "member:profile-image",
+          {
+            csrfToken,
+            imageData: reader.result
+          },
+          (response) => {
+            profileImageStatus.textContent =
+              response && response.ok
+                ? "Profile picture updated."
+                : (response && response.error) || "Upload failed.";
+            profileImageInput.value = "";
+          }
+        );
+      });
+
+      reader.addEventListener("error", () => {
+        profileImageStatus.textContent = "Could not read that image.";
+        profileImageInput.value = "";
+      });
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (removeProfileImageButton) {
+    removeProfileImageButton.addEventListener("click", () => {
+      socket.emit(
+        "member:profile-image",
+        {
+          csrfToken,
+          remove: true
+        },
+        (response) => {
+          profileImageStatus.textContent =
+            response && response.ok
+              ? "Profile picture removed."
+              : (response && response.error) || "Could not remove picture.";
+        }
+      );
+    });
+  }
 
   chatForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -672,6 +969,7 @@
 
   socket.on("chat:new", (message) => {
     appendMessage(message);
+    setSpeechBubble(message.username, message.message_text);
   });
 
   socket.on("chat:deleted", ({ id }) => {
