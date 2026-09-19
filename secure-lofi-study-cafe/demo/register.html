@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Secure Lo-Fi Study Cafe security engineering showcase">
-  <title>Register | Secure Lo-Fi Study Cafe</title>
-  <link rel="stylesheet" href="./style.css?v=3.1.1">
+  <meta name="description" content="Secure Lo-Fi Study Cafe shared account registration requirement">
+  <title>Registration | Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="./style.css?v=4.0.1">
 </head>
 <body class="auth-page">
   <main class="auth-shell">
@@ -16,34 +16,28 @@
         <span class="steam steam-three"></span>
         <span class="coffee-cup">☕</span>
       </div>
-      <h1 id="register-title">Create Account</h1>
-      <p class="auth-subtitle">Register to join your cozy study room.</p>
 
-      <div id="auth-error" class="alert" role="alert" hidden></div>
+      <h1 id="register-title">Shared Registration</h1>
+      <p class="auth-subtitle">
+        User accounts must be created on the live self-hosted server.
+      </p>
 
-      <form id="auth-form" data-auth-mode="register" class="stack-form">
-        <label>
-          Username
-          <input id="username" name="username" autocomplete="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" placeholder="Choose a username" required>
-        </label>
+      <div class="alert" role="status">
+        GitHub Pages is a static host. It cannot run the Node.js, SQLite,
+        Express-session, or Socket.IO backend required for accounts on separate
+        phones and computers to see one another.
+      </div>
 
-        <label>
-          Password
-          <input id="password" type="password" name="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required>
-        </label>
+      <p class="security-note">
+        Once the self-hosted server is running, everyone must open the same
+        server URL. Registration there writes to the shared SQLite users table,
+        and Socket.IO publishes realtime presence to every connected room member.
+      </p>
 
-        <div>
-          <button class="button primary" type="submit">Register</button>
-        </div>
-
-        <p class="auth-switch">Already have an account? <a href="./index.html">Log In</a></p>
-        <p class="security-note">For safety and moderation, the café records usernames, account activity, chat submissions, music requests, and administrative actions. Passwords, session tokens, precise location, browser history, and unrelated device data are not shown to admins.</p>
-      </form>
-
-      <p class="security-note">Accounts created on this static GitHub Pages build are stored only in the current browser. The full Node.js application authenticates against SQLite using bcrypt password hashes and server-side sessions.</p>
+      <p class="auth-switch">
+        <a href="./index.html">Back to the interface preview</a>
+      </p>
     </section>
   </main>
-
-  <script src="./auth.js?v=3.1.1"></script>
 </body>
 </html>
