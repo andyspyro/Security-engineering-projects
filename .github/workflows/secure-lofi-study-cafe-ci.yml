@@ -29,6 +29,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Use Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
       - name: Install dependencies for validation
         run: npm install --no-audit --no-fund
 
@@ -36,7 +41,7 @@ jobs:
         run: |
           node --check server.js
           node --check database.js
-          node --check libsql-session-store.js
+          node --check sqlite-session-store.js
           node --check public/cafe.js
           node --check public/admin.js
           node --check demo/auth.js
@@ -55,7 +60,14 @@ jobs:
           }
           NODE
 
-      - name: Verify libSQL security schema and indexes
+      - name: Check self-host deployment shell scripts
+        run: |
+          bash -n deploy/scripts/install-self-hosted.sh
+          bash -n deploy/scripts/backup-sqlite.sh
+          bash -n deploy/scripts/restore-sqlite.sh
+          bash -n deploy/scripts/healthcheck.sh
+
+      - name: Verify self-hosted SQLite security schema and indexes
         run: npm run test:security
 
       - name: Build production container
