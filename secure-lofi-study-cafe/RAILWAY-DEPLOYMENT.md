@@ -62,6 +62,8 @@ The application stores:
 
 on that volume.
 
+Railway mounts volumes as root-owned storage. The container entrypoint starts as root only long enough to set ownership on `/data`, then uses `gosu` to launch the Node.js process as the unprivileged `node` user.
+
 The SQLite database contains users, messages, music state, sessions, audit logs, and security telemetry.
 
 ## Service source
