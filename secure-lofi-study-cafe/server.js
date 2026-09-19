@@ -1326,6 +1326,19 @@ app.post(
             current.position,
             previous.id
           ]);
+
+          await writeAudit(
+            req.session.user.id,
+            "music.queue_reorder",
+            `Moved queue track ID ${current.id} up`,
+            {
+              details: {
+                trackId: current.id,
+                fromPosition: current.position,
+                toPosition: previous.position
+              }
+            }
+          );
         }
       }
 
@@ -1372,6 +1385,19 @@ app.post(
             current.position,
             next.id
           ]);
+
+          await writeAudit(
+            req.session.user.id,
+            "music.queue_reorder",
+            `Moved queue track ID ${current.id} down`,
+            {
+              details: {
+                trackId: current.id,
+                fromPosition: current.position,
+                toPosition: next.position
+              }
+            }
+          );
         }
       }
 
@@ -1401,6 +1427,12 @@ app.post(
 
       if (isModerator(req.session.user)) {
         await queueTrackAgain(track, req.session.user);
+        await writeAudit(
+          req.session.user.id,
+          "music.request_again",
+          `Re-queued history track ID ${track.id}`,
+          { details: { trackId: track.id, title: track.title } }
+        );
       } else {
         await db.run(
           `
@@ -1414,6 +1446,13 @@ app.post(
             track.video_id,
             track.start_seconds
           ]
+        );
+
+        await writeAudit(
+          req.session.user.id,
+          "music.request_again",
+          `Requested history track ID ${track.id} again`,
+          { details: { trackId: track.id, title: track.title } }
         );
 
         await emitPendingRequests();
