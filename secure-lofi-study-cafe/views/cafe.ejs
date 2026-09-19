@@ -28,8 +28,8 @@
     </div>
 
     <div class="topbar-actions">
-      <a class="button secondary small" href="/security">Security Engineering</a>
       <% if (canAssignTempAdmin) { %>
+        <a class="button secondary small" href="/security">Security Engineering</a>
         <a class="button primary small" href="/admin">Admin Console</a>
       <% } %>
       <form method="post" action="/logout">
