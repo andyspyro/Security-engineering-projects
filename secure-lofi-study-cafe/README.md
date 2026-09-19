@@ -1,6 +1,6 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 3.0.0  
+> **Release:** 3.1.0  
 > **Type:** Full-stack secure realtime web application  
 > **Stack:** Node.js, Express, SQLite, EJS, Socket.IO  
 > **Security focus:** authentication, sessions, RBAC, CSRF, parameterized SQL, structured security telemetry, audit logging, secure uploads, moderation, and incident reconstruction
@@ -16,13 +16,13 @@ username: admin
 password: admin12345
 ```
 
-The public GitHub Pages site is static. The built-in administrator above exists only so the same showcase login works across desktop and mobile browsers.
+The public GitHub Pages site is static. The built-in administrator above is only a UI showcase credential.
 
-Accounts created through the Pages registration form are browser-local because GitHub Pages does not run Node.js or SQLite.
+Accounts created through the Pages registration form remain browser-local because GitHub Pages does not run Node.js, Socket.IO, or SQLite.
 
-The full backend source in this directory implements the actual shared account database, bcrypt authentication, Express sessions, server-side authorization, Socket.IO, SQL security logging, and admin audit records.
+The production architecture is the full backend in this directory. When deployed to Railway, every device connects to the same account database, persistent session store, Socket.IO room, RBAC rules, audit trail, and security-event database. That is the deployment in which an administrator on a computer can see a normal user such as `bunny` join from a phone.
 
-## Version 3.0 security engineering
+## Version 3.1 shared backend and security engineering
 
 Version 3.0 adds a dedicated SQLite security telemetry pipeline alongside the existing application audit trail.
 
@@ -164,11 +164,7 @@ In the full backend:
 /security
 ```
 
-In the GitHub Pages build:
-
-```text
-secure-lofi-study-cafe/security.html
-```
+In the GitHub Pages build, the equivalent interface is guarded by the reserved showcase administrator session. In the full backend, `/security` is protected by `requirePermanentAdmin`.
 
 It presents the backend controls, SQL event model, forensic examples, and trust boundaries directly from the application interface.
 
@@ -254,7 +250,9 @@ GitHub Actions performs:
 * required-table verification;
 * required-index verification;
 * security-event insert/query verification;
-* SQLite query-plan generation.
+* SQLite query-plan generation;
+* persistent-session table verification;
+* production Docker image build.
 
 Run the database security test locally:
 
@@ -276,7 +274,14 @@ Generate a session secret:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Set the generated value as `SESSION_SECRET`, then start:
+Set the generated value as `SESSION_SECRET`. Also set:
+
+```text
+ADMIN_USERNAME=<your permanent admin username>
+ADMIN_PASSWORD=<a private password of at least 12 characters>
+```
+
+Then start:
 
 ```bash
 npm start
@@ -288,7 +293,33 @@ Open:
 http://localhost:3000
 ```
 
-The first account in a new local database is provisioned as the permanent administrator. Production deployment should replace bootstrap-first-admin behavior with an explicit administrative provisioning process.
+Public registration always creates a normal `user` account. Permanent administrator provisioning is explicit and server-controlled.
+
+## Railway production deployment
+
+The repository root contains `Dockerfile` and `railway.json` for the full Node.js backend.
+
+Required Railway variables:
+
+```text
+NODE_ENV=production
+SESSION_SECRET=<strong random secret>
+ADMIN_USERNAME=<private permanent-admin username>
+ADMIN_PASSWORD=<private password, 12+ characters>
+DB_PATH=/data/lofi_cafe.db
+```
+
+Railway supplies `PORT`.
+
+Attach a Railway persistent volume to the service at:
+
+```text
+/data
+```
+
+The application uses `/healthz` as a database-aware deployment healthcheck.
+
+With that topology, desktop and mobile users share the same SQL accounts, Express sessions, Socket.IO presence/chat, administrator permissions, and audit/security logs.
 
 ## Repository map
 
@@ -302,8 +333,10 @@ The first account in a new local database is provisioned as the permanent admini
 | [views/security.ejs](views/security.ejs) | backend security architecture interface |
 | [public/cafe.js](public/cafe.js) | realtime client behavior |
 | [public/style.css](public/style.css) | responsive café/security interface |
+| [sqlite-session-store.js](sqlite-session-store.js) | persistent SQLite-backed Express session store |
 | [scripts/security-smoke-test.js](scripts/security-smoke-test.js) | in-memory SQLite security validation |
-| [SECURITY-ENGINEERING-REPORT-v3.0.md](SECURITY-ENGINEERING-REPORT-v3.0.md) | full v3.0 engineering report |
+| [SECURITY-ENGINEERING-REPORT-v3.1.md](SECURITY-ENGINEERING-REPORT-v3.1.md) | latest shared-backend/security engineering report |
+| [SECURITY-ENGINEERING-REPORT-v3.0.md](SECURITY-ENGINEERING-REPORT-v3.0.md) | version 3.0 telemetry/security report |
 | [CHANGELOG.md](CHANGELOG.md) | release history |
 | [UI-UX-ENHANCEMENT-REPORT.md](UI-UX-ENHANCEMENT-REPORT.md) | interface, mobile, avatar, and accessibility design |
 
@@ -315,4 +348,4 @@ Security decisions were cross-checked against:
 * OWASP Session Management Cheat Sheet
 * OWASP File Upload Cheat Sheet
 
-Full links and implementation mapping are documented in [SECURITY-ENGINEERING-REPORT-v3.0.md](SECURITY-ENGINEERING-REPORT-v3.0.md).
+Full links and implementation mapping are documented in [SECURITY-ENGINEERING-REPORT-v3.1.md](SECURITY-ENGINEERING-REPORT-v3.1.md).
