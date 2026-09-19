@@ -297,7 +297,7 @@ Public registration always creates a normal `user` account. Permanent administra
 
 ## Railway production deployment
 
-The repository root contains `Dockerfile` and `railway.json` for the full Node.js backend.
+The repository root contains a production `Dockerfile` for the full Node.js backend. Railway auto-detects a root Dockerfile for GitHub-backed services. Healthcheck, volume, variables, and public networking are configured in the Railway service settings.
 
 Required Railway variables:
 
