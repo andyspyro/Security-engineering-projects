@@ -44,7 +44,8 @@ async function main() {
     "music_requests",
     "music_queue",
     "audit_logs",
-    "security_events"
+    "security_events",
+    "sessions"
   ]);
 
   const tables = await all(
@@ -63,7 +64,8 @@ async function main() {
     "idx_security_events_actor",
     "idx_security_events_severity_outcome",
     "idx_audit_logs_created_at",
-    "idx_messages_user_created"
+    "idx_messages_user_created",
+    "idx_sessions_expires_at"
   ]);
 
   const indexes = await all(
@@ -74,6 +76,27 @@ async function main() {
     if (!indexes.some((row) => row.name === index)) {
       throw new Error(`Missing required index: ${index}`);
     }
+  }
+
+  await run(
+    `
+    INSERT INTO sessions (sid, sess, expires_at)
+    VALUES (?, ?, ?)
+    `,
+    [
+      "smoke-session",
+      JSON.stringify({ user: { id: 1, username: "admin", role: "admin" } }),
+      Date.now() + 60_000
+    ]
+  );
+
+  const sessionRows = await all(
+    "SELECT sid, expires_at FROM sessions WHERE sid = ?",
+    ["smoke-session"]
+  );
+
+  if (sessionRows.length !== 1 || sessionRows[0].sid !== "smoke-session") {
+    throw new Error("Persistent session table verification failed.");
   }
 
   await run(
