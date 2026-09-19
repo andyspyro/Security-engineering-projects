@@ -2300,6 +2300,17 @@ io.on("connection", async (socket) => {
 
   addSocketToPresence(socket, user);
 
+  writeSecurityEvent({
+    eventType: "socket.connected",
+    severity: "INFO",
+    actorUserId: user.id,
+    usernameSnapshot: user.username,
+    outcome: "success",
+    route: "socket.io",
+    sessionRef: makeSessionRef(socket.request.sessionID),
+    metadata: { socketId: crypto.createHash("sha256").update(socket.id).digest("hex").slice(0, 16) }
+  }).catch((err) => console.error("Socket connection security log error:", err));
+
   try {
     socket.emit("player:state", await getPlayerState());
     socket.emit("presence:update", {
@@ -2420,6 +2431,16 @@ io.on("connection", async (socket) => {
 
     try {
       if (!data || data.csrfToken !== userSession.csrfToken) {
+        await writeSecurityEvent({
+          eventType: "profile.image_csrf_failed",
+          severity: "HIGH",
+          actorUserId: user.id,
+          usernameSnapshot: user.username,
+          outcome: "blocked",
+          route: "socket.io/member:profile-image",
+          sessionRef: makeSessionRef(socket.request.sessionID)
+        });
+
         reply({ ok: false, error: "Invalid security token." });
         return;
       }
@@ -2450,6 +2471,17 @@ io.on("connection", async (socket) => {
       const validatedImage = validateProfileImageDataUrl(data.imageData);
 
       if (!validatedImage) {
+        await writeSecurityEvent({
+          eventType: "profile.image_rejected",
+          severity: "WARNING",
+          actorUserId: user.id,
+          usernameSnapshot: user.username,
+          outcome: "blocked",
+          route: "socket.io/member:profile-image",
+          sessionRef: makeSessionRef(socket.request.sessionID),
+          metadata: { reason: "invalid_type_signature_or_size" }
+        });
+
         reply({
           ok: false,
           error: "Use a PNG, JPEG, or WebP image no larger than 512 KB."
@@ -2471,6 +2503,16 @@ io.on("connection", async (socket) => {
         "profile.image_update",
         "Updated profile image"
       );
+
+      await writeSecurityEvent({
+        eventType: "profile.image_update",
+        severity: "INFO",
+        actorUserId: user.id,
+        usernameSnapshot: user.username,
+        outcome: "success",
+        route: "socket.io/member:profile-image",
+        sessionRef: makeSessionRef(socket.request.sessionID)
+      });
 
       emitPresence();
       reply({ ok: true });
@@ -2543,6 +2585,16 @@ io.on("connection", async (socket) => {
 
   socket.on("disconnect", () => {
     removeSocketFromPresence(socket, user);
+
+    writeSecurityEvent({
+      eventType: "socket.disconnected",
+      severity: "INFO",
+      actorUserId: user.id,
+      usernameSnapshot: user.username,
+      outcome: "success",
+      route: "socket.io",
+      sessionRef: makeSessionRef(socket.request.sessionID)
+    }).catch((err) => console.error("Socket disconnect security log error:", err));
   });
 });
 
