@@ -145,7 +145,7 @@
             <button class="button primary" type="submit">Send</button>
           </form>
 
-          <p class="compact">Messages are censored for blocked words and displayed as text to reduce script injection risk.</p>
+          <p class="compact">Regular-user messages are censored for blocked words and displayed as text to reduce script injection risk. Admin messages are not filtered.</p>
 
           <div id="chat-log" class="chat-log" aria-live="polite" style="margin-top:1rem">
             <% [...messages].reverse().forEach((message) => { %>
