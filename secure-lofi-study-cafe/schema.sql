@@ -64,6 +64,16 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 
+CREATE TABLE IF NOT EXISTS sessions (
+    sid TEXT PRIMARY KEY,
+    sess TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at
+    ON sessions(expires_at);
+
 CREATE TABLE IF NOT EXISTS security_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_uuid TEXT UNIQUE NOT NULL,
