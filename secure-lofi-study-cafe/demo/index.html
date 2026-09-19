@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Secure Lo-Fi Study Cafe security engineering showcase">
   <title>Welcome Back | Secure Lo-Fi Study Cafe</title>
-  <link rel="stylesheet" href="./style.css?v=3.1.1">
+  <link rel="stylesheet" href="./style.css?v=4.0.1">
 </head>
 <body class="auth-page">
   <main class="auth-shell">
@@ -36,13 +36,13 @@
           <button class="button primary" type="submit">Log In</button>
         </div>
 
-        <p class="auth-switch">Need an account? <a href="./register.html">Register</a></p>
+        <p class="auth-switch">Need a real shared account? <a href="./register.html">Read the live-server requirement</a></p>
       </form>
 
-      <p class="security-note"><strong>Cross-device showcase admin:</strong> admin / admin12345. User-created accounts on this static GitHub Pages build remain browser-local. The full Node.js application uses server-side bcrypt authentication, sessions, SQLite, CSRF validation, RBAC, and structured security logging.</p>
+      <p class="security-note"><strong>Static interface preview:</strong> admin / admin12345. GitHub Pages has no Node.js or Socket.IO backend, so it cannot create shared accounts or show people on other devices. Real users must register on the self-hosted server.</p>
     </section>
   </main>
 
-  <script src="./auth.js?v=3.1.1"></script>
+  <script src="./auth.js?v=4.0.1"></script>
 </body>
 </html>
