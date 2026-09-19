@@ -88,11 +88,19 @@
   controllerName.textContent = session.username;
 
   if (adminConsoleLink) {
-    adminConsoleLink.hidden = !isAdmin;
+    if (isAdmin) {
+      adminConsoleLink.hidden = false;
+    } else {
+      adminConsoleLink.remove();
+    }
   }
 
   if (securityEngineeringLink) {
-    securityEngineeringLink.hidden = !isAdmin;
+    if (isAdmin) {
+      securityEngineeringLink.hidden = false;
+    } else {
+      securityEngineeringLink.remove();
+    }
   }
 
   const members = [
