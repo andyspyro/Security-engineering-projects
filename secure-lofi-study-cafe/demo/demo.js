@@ -67,6 +67,9 @@
   const chatLog = document.getElementById("chat-log");
   const minimizeChat = document.getElementById("minimize-chat");
   const chatBody = document.getElementById("chat-body");
+  const avatarStage = document.getElementById("avatar-stage");
+  const avatarLayer = document.getElementById("avatar-layer");
+  const floorMemberCount = document.getElementById("floor-member-count");
 
   usernameEl.textContent = session.username;
   roleEl.textContent = session.role;
@@ -83,7 +86,10 @@
       role: session.role,
       controller: isAdmin,
       tempAdmin: false,
-      status: "Paused: 0:00 · Synced"
+      status: "Paused: 0:00 · Synced",
+      avatarStyle: "latte",
+      avatarX: 36,
+      avatarY: 58
     },
     {
       id: 2,
@@ -91,7 +97,10 @@
       role: "user",
       controller: false,
       tempAdmin: false,
-      status: "Paused: 0:00 · Independent"
+      status: "Paused: 0:00 · Independent",
+      avatarStyle: "lavender",
+      avatarX: 67,
+      avatarY: 36
     },
     {
       id: 3,
@@ -99,7 +108,10 @@
       role: "user",
       controller: false,
       tempAdmin: false,
-      status: "Online · Synced"
+      status: "Online · Synced",
+      avatarStyle: "matcha",
+      avatarX: 73,
+      avatarY: 72
     }
   ];
 
@@ -130,6 +142,75 @@
     }
 
     return cleanText;
+  }
+
+
+  function avatarGlyph(style) {
+    const glyphs = {
+      latte: "☕",
+      mocha: "🧸",
+      matcha: "🌿",
+      berry: "🍓",
+      sky: "☁",
+      lavender: "✦"
+    };
+
+    return glyphs[style] || "☕";
+  }
+
+  function renderAvatars() {
+    if (!avatarLayer) {
+      return;
+    }
+
+    avatarLayer.replaceChildren();
+
+    if (floorMemberCount) {
+      floorMemberCount.textContent = String(members.length);
+    }
+
+    members.forEach((member, index) => {
+      const avatar = document.createElement("div");
+      const isCurrent = index === 0;
+
+      avatar.className = `room-avatar avatar-${member.avatarStyle}${isCurrent ? " is-you" : ""}`;
+      avatar.style.left = `${member.avatarX}%`;
+      avatar.style.top = `${member.avatarY}%`;
+
+      const face = document.createElement("span");
+      face.className = "avatar-face";
+      face.textContent = avatarGlyph(member.avatarStyle);
+
+      const label = document.createElement("span");
+      label.className = "avatar-name";
+      label.textContent = isCurrent ? `${member.username} · you` : member.username;
+
+      const state = document.createElement("span");
+      state.className = "avatar-state-dot";
+      if (member.controller) {
+        state.classList.add("controller");
+      }
+
+      avatar.append(face, label, state);
+      avatarLayer.appendChild(avatar);
+    });
+  }
+
+  function moveCurrentAvatar(dx, dy) {
+    const member = members[0];
+    member.avatarX = Math.min(92, Math.max(8, member.avatarX + dx));
+    member.avatarY = Math.min(92, Math.max(8, member.avatarY + dy));
+    renderAvatars();
+  }
+
+  function setCurrentAvatarStyle(style) {
+    const allowed = ["latte", "mocha", "matcha", "berry", "sky", "lavender"];
+    if (!allowed.includes(style)) {
+      return;
+    }
+
+    members[0].avatarStyle = style;
+    renderAvatars();
   }
 
   function makeButton(label, className, handler) {
@@ -560,6 +641,55 @@
     renderPending();
   });
 
+
+  if (avatarStage) {
+    avatarStage.addEventListener("keydown", (event) => {
+      const moves = {
+        ArrowUp: [0, -5],
+        ArrowDown: [0, 5],
+        ArrowLeft: [-5, 0],
+        ArrowRight: [5, 0],
+        w: [0, -5],
+        W: [0, -5],
+        s: [0, 5],
+        S: [0, 5],
+        a: [-5, 0],
+        A: [-5, 0],
+        d: [5, 0],
+        D: [5, 0]
+      };
+
+      const move = moves[event.key];
+      if (!move) {
+        return;
+      }
+
+      event.preventDefault();
+      moveCurrentAvatar(move[0], move[1]);
+    });
+  }
+
+  document.querySelectorAll("[data-move]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const moves = {
+        up: [0, -5],
+        down: [0, 5],
+        left: [-5, 0],
+        right: [5, 0]
+      };
+      const move = moves[button.dataset.move];
+      if (move) {
+        moveCurrentAvatar(move[0], move[1]);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-avatar-style]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setCurrentAvatarStyle(button.dataset.avatarStyle);
+    });
+  });
+
   chatForm.addEventListener("submit", (event) => {
     event.preventDefault();
 
@@ -626,6 +756,7 @@
   }
 
   renderMembers();
+  renderAvatars();
   renderQueue();
   renderPending();
   renderHistory();
