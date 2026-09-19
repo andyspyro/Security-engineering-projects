@@ -14,6 +14,29 @@
 
   const ACCOUNTS_KEY = "secureLofiDemoAccounts";
   const SESSION_KEY = "secureLofiDemoSession";
+  const AUDIT_KEY = "secureLofiDemoAudit";
+
+  function logAudit(account, eventType, action, details = {}) {
+    let audit = [];
+
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]");
+      audit = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      audit = [];
+    }
+
+    audit.push({
+      timestamp: new Date().toISOString(),
+      eventType,
+      actor: account.username,
+      role: account.role,
+      action,
+      details
+    });
+
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(audit.slice(-1000)));
+  }
 
   function showError(message) {
     errorBox.hidden = false;
@@ -89,6 +112,8 @@
   }
 
   function startSession(account) {
+    logAudit(account, "auth.login", "Successful login");
+
     sessionStorage.setItem(
       SESSION_KEY,
       JSON.stringify({
@@ -136,12 +161,18 @@
       const account = {
         username,
         role: accounts.length === 0 ? "admin" : "user",
+        createdAt: new Date().toISOString(),
         salt: bytesToBase64(salt),
         verifier: bytesToBase64(derived)
       };
 
       accounts.push(account);
       saveAccounts(accounts);
+      logAudit(
+        account,
+        "account.register",
+        `Account registered as ${account.role}`
+      );
       startSession(account);
       return;
     }
