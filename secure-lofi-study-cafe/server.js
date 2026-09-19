@@ -791,7 +791,9 @@ function getMembersList() {
     avatarStyle: member.avatarStyle,
     avatarX: member.avatarX,
     avatarY: member.avatarY,
-    avatarImage: member.avatarImage || null
+    avatarImageUrl: member.hasAvatarImage
+      ? `/profile-image/${member.id}?v=${member.avatarImageVersion}`
+      : null
   }));
 }
 
@@ -847,7 +849,8 @@ function addSocketToPresence(socket, user) {
       avatarStyle: avatar.avatarStyle,
       avatarX: avatar.avatarX,
       avatarY: avatar.avatarY,
-      avatarImage: user.avatarImage || null,
+      hasAvatarImage: Boolean(user.avatarImage),
+      avatarImageVersion: Date.now(),
       updatedAt: Date.now()
     });
   }
@@ -1105,6 +1108,50 @@ app.post("/logout", verifyCsrf, async (req, res) => {
   req.session.destroy(() => {
     res.redirect("/login");
   });
+});
+
+app.get("/profile-image/:id", requireLogin, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+
+    if (!Number.isInteger(userId) || userId < 1) {
+      return res.status(404).end();
+    }
+
+    const row = await db.get(
+      "SELECT avatar_image FROM users WHERE id = ?",
+      [userId]
+    );
+
+    if (!row || !row.avatar_image) {
+      return res.status(404).end();
+    }
+
+    const validatedImage = validateProfileImageDataUrl(row.avatar_image);
+
+    if (!validatedImage) {
+      return res.status(404).end();
+    }
+
+    const match = validatedImage.match(
+      /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/
+    );
+
+    if (!match) {
+      return res.status(404).end();
+    }
+
+    const imageBytes = Buffer.from(match[2], "base64");
+
+    res.setHeader("Content-Type", match[1]);
+    res.setHeader("Content-Length", String(imageBytes.length));
+    res.setHeader("Cache-Control", "private, max-age=300");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.send(imageBytes);
+  } catch (err) {
+    console.error("Profile image read error:", err);
+    res.status(500).end();
+  }
 });
 
 app.get("/cafe", requireLogin, async (req, res) => {
@@ -2158,7 +2205,8 @@ io.on("connection", async (socket) => {
 
       if (data.remove === true) {
         await db.run("UPDATE users SET avatar_image = NULL WHERE id = ?", [user.id]);
-        member.avatarImage = null;
+        member.hasAvatarImage = false;
+        member.avatarImageVersion = Date.now();
         member.updatedAt = Date.now();
 
         await writeAudit(
@@ -2187,7 +2235,8 @@ io.on("connection", async (socket) => {
         [validatedImage, user.id]
       );
 
-      member.avatarImage = validatedImage;
+      member.hasAvatarImage = true;
+      member.avatarImageVersion = Date.now();
       member.updatedAt = Date.now();
 
       await writeAudit(
