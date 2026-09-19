@@ -1,53 +1,97 @@
 (() => {
   "use strict";
 
-  const chatForm = document.getElementById("chat-form");
-  const chatInput = document.getElementById("chat-input");
-  const chatLog = document.getElementById("chat-log");
+  const SESSION_KEY = "secureLofiDemoSession";
+
+  let session;
+
+  try {
+    session = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
+  } catch {
+    session = null;
+  }
+
+  if (!session || !session.username || !session.role) {
+    window.location.replace("./index.html");
+    return;
+  }
+
+  const isAdmin = session.role === "admin";
+
+  const usernameEl = document.getElementById("session-username");
+  const roleEl = document.getElementById("session-role");
+  const controllerName = document.getElementById("controller-name");
+  const logoutButton = document.getElementById("logout-button");
+  const queueList = document.getElementById("queue-list");
+  const historyList = document.getElementById("history-list");
+  const pendingList = document.getElementById("pending-list");
+  const pendingSection = document.getElementById("pending-section");
   const requestForm = document.getElementById("request-form");
   const requestTitle = document.getElementById("request-title");
   const requestUrl = document.getElementById("request-url");
-  const queueList = document.getElementById("queue-list");
-  const voteButton = document.getElementById("vote-button");
-  const voteCount = document.getElementById("vote-count");
+  const requestFeedback = document.getElementById("request-feedback");
+  const player = document.getElementById("demo-player");
+  const nowPlayingTitle = document.getElementById("now-playing-title");
+  const requestedByLine = document.getElementById("requested-by-line");
   const playerStatus = document.getElementById("player-status");
+  const controllerBadge = document.getElementById("controller-badge");
+  const voteCount = document.getElementById("vote-count");
+  const adminNextButton = document.getElementById("admin-next-button");
+  const membersList = document.getElementById("members-list");
+  const chatForm = document.getElementById("chat-form");
+  const chatInput = document.getElementById("chat-input");
+  const chatLog = document.getElementById("chat-log");
+  const minimizeChat = document.getElementById("minimize-chat");
+  const chatBody = document.getElementById("chat-body");
 
+  usernameEl.textContent = session.username;
+  roleEl.textContent = session.role;
+  controllerName.textContent = session.username;
+
+  const members = [
+    {
+      id: 1,
+      username: session.username,
+      role: session.role,
+      controller: isAdmin,
+      tempAdmin: false,
+      status: "Paused: 0:00 · Synced"
+    },
+    {
+      id: 2,
+      username: "Test",
+      role: "user",
+      controller: false,
+      tempAdmin: false,
+      status: "Paused: 0:00 · Independent"
+    },
+    {
+      id: 3,
+      username: "StudyBuddy",
+      role: "user",
+      controller: false,
+      tempAdmin: false,
+      status: "Online · Synced"
+    }
+  ];
+
+  let queue = [];
+  let pending = [];
+  let history = [];
+  let currentTrack = null;
   let votes = 0;
+  let followingRoom = true;
 
-  chatForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const value = chatInput.value.trim();
-    if (!value) return;
+  function makeButton(label, className, handler) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `button ${className || "secondary"}`;
+    button.textContent = label;
+    button.addEventListener("click", handler);
+    return button;
+  }
 
-    const article = document.createElement("article");
-    article.className = "message";
-
-    const meta = document.createElement("div");
-    meta.className = "message-meta";
-
-    const author = document.createElement("strong");
-    author.textContent = "portfolio_demo";
-
-    const time = document.createElement("span");
-    time.textContent = "just now";
-
-    const message = document.createElement("p");
-    message.textContent = value;
-
-    meta.append(author, time);
-    article.append(meta, message);
-    chatLog.appendChild(article);
-    chatInput.value = "";
-    chatLog.scrollTop = chatLog.scrollHeight;
-  });
-
-  requestForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const title = requestTitle.value.trim();
-    const url = requestUrl.value.trim();
-
-    if (!title || !url) return;
-
+  function makeListItem(title, meta) {
     const item = document.createElement("div");
     item.className = "list-item";
 
@@ -58,35 +102,425 @@
     heading.className = "list-item-title";
     heading.textContent = title;
 
-    const meta = document.createElement("p");
-    meta.className = "list-item-meta";
-    meta.textContent = "demo request · portfolio_demo";
+    const detail = document.createElement("p");
+    detail.className = "list-item-meta";
+    detail.textContent = meta;
 
-    copy.append(heading, meta);
-    item.appendChild(copy);
-    queueList.appendChild(item);
+    const actions = document.createElement("div");
+    actions.className = "list-actions";
+
+    copy.append(heading, detail);
+    item.append(copy, actions);
+
+    return { item, actions };
+  }
+
+  function parseYouTube(input) {
+    try {
+      const parsed = new URL(input.trim());
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+      let id = null;
+
+      if (
+        host === "youtube.com" ||
+        host === "m.youtube.com" ||
+        host === "music.youtube.com"
+      ) {
+        id = parsed.searchParams.get("v");
+
+        if (!id && parsed.pathname.startsWith("/shorts/")) {
+          id = parsed.pathname.split("/")[2];
+        }
+
+        if (!id && parsed.pathname.startsWith("/embed/")) {
+          id = parsed.pathname.split("/")[2];
+        }
+      }
+
+      if (host === "youtu.be") {
+        id = parsed.pathname.split("/")[1];
+      }
+
+      if (!id || !/^[A-Za-z0-9_-]{11}$/.test(id)) {
+        return null;
+      }
+
+      return id;
+    } catch {
+      return null;
+    }
+  }
+
+  function renderMembers() {
+    membersList.replaceChildren();
+
+    members.forEach((member) => {
+      const card = document.createElement("div");
+      card.className = "member-card";
+
+      const left = document.createElement("div");
+
+      const name = document.createElement("div");
+      name.className =
+        member.role === "admin" ? "member-name admin-name" : "member-name";
+      name.textContent =
+        member.role === "admin" ? `♛ ${member.username}` : member.username;
+
+      const status = document.createElement("p");
+      status.className = "member-status";
+      status.textContent = member.status;
+
+      left.append(name, status);
+
+      const right = document.createElement("div");
+      right.className = "list-actions";
+
+      const role = document.createElement("span");
+      role.className = `badge ${member.role === "admin" ? "admin" : "user"}`;
+      role.textContent = member.role;
+      right.appendChild(role);
+
+      if (member.controller) {
+        const controller = document.createElement("span");
+        controller.className = "badge controller";
+        controller.textContent = "controller";
+        right.appendChild(controller);
+      }
+
+      if (member.tempAdmin && member.role !== "admin") {
+        const temp = document.createElement("span");
+        temp.className = "badge admin";
+        temp.textContent = "temp admin";
+        right.appendChild(temp);
+      }
+
+      if (isAdmin && member.id !== 1) {
+        right.appendChild(
+          makeButton(
+            member.tempAdmin ? "Remove Temp Admin" : "Make Temp Admin",
+            "secondary",
+            () => {
+              member.tempAdmin = !member.tempAdmin;
+              member.controller = member.tempAdmin;
+
+              if (member.tempAdmin) {
+                members[0].controller = false;
+                controllerName.textContent = member.username;
+                controllerBadge.textContent = "Synced Room";
+                appendSystem(
+                  `${member.username} was assigned as temporary room controller.`
+                );
+              } else {
+                member.controller = false;
+                members[0].controller = true;
+                controllerName.textContent = session.username;
+                appendSystem(
+                  `${member.username} is no longer a temporary room controller.`
+                );
+              }
+
+              renderMembers();
+            }
+          )
+        );
+      }
+
+      card.append(left, right);
+      membersList.appendChild(card);
+    });
+  }
+
+  function renderQueue() {
+    queueList.replaceChildren();
+
+    if (!queue.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Nothing is queued yet.";
+      queueList.appendChild(empty);
+      return;
+    }
+
+    queue.forEach((track, index) => {
+      const { item, actions } = makeListItem(
+        `${index + 1}. ${track.title}`,
+        `Requested by ${track.requestedBy}`
+      );
+
+      if (isAdmin) {
+        actions.append(
+          makeButton("Up", "secondary", () => moveTrack(index, -1)),
+          makeButton("Down", "secondary", () => moveTrack(index, 1)),
+          makeButton("Play Now", "secondary", () => playTrack(index)),
+          makeButton("Remove", "danger", () => {
+            queue.splice(index, 1);
+            renderQueue();
+          })
+        );
+      }
+
+      queueList.appendChild(item);
+    });
+  }
+
+  function renderPending() {
+    if (!isAdmin) {
+      pendingSection.hidden = true;
+      return;
+    }
+
+    pendingSection.hidden = false;
+    pendingList.replaceChildren();
+
+    if (!pending.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "No pending requests.";
+      pendingList.appendChild(empty);
+      return;
+    }
+
+    pending.forEach((track, index) => {
+      const { item, actions } = makeListItem(
+        track.title,
+        `Requested by ${track.requestedBy}`
+      );
+
+      actions.append(
+        makeButton("Approve", "primary", () => {
+          queue.push(track);
+          pending.splice(index, 1);
+          requestFeedback.textContent = `${track.title} was approved and added to the shared playlist.`;
+          renderPending();
+          renderQueue();
+        }),
+        makeButton("Reject", "danger", () => {
+          pending.splice(index, 1);
+          requestFeedback.textContent = `${track.title} was rejected.`;
+          renderPending();
+        })
+      );
+
+      pendingList.appendChild(item);
+    });
+  }
+
+  function renderHistory() {
+    historyList.replaceChildren();
+
+    if (!history.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "No tracks have played yet.";
+      historyList.appendChild(empty);
+      return;
+    }
+
+    history.forEach((track) => {
+      const { item, actions } = makeListItem(
+        track.title,
+        `Requested by ${track.requestedBy}`
+      );
+
+      actions.appendChild(
+        makeButton("Request Again", "secondary", () => {
+          pending.push({ ...track });
+          requestFeedback.textContent = `${track.title} was requested again.`;
+          renderPending();
+        })
+      );
+
+      historyList.appendChild(item);
+    });
+  }
+
+  function moveTrack(index, delta) {
+    const target = index + delta;
+
+    if (target < 0 || target >= queue.length) {
+      return;
+    }
+
+    [queue[index], queue[target]] = [queue[target], queue[index]];
+    renderQueue();
+  }
+
+  function showPlayer(track) {
+    player.replaceChildren();
+
+    const iframe = document.createElement("iframe");
+    iframe.src =
+      `https://www.youtube-nocookie.com/embed/${encodeURIComponent(track.videoId)}?rel=0`;
+    iframe.title = track.title;
+    iframe.allow =
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.allowFullscreen = true;
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+
+    player.appendChild(iframe);
+  }
+
+  function playTrack(index) {
+    if (index < 0 || index >= queue.length) {
+      return;
+    }
+
+    if (currentTrack) {
+      history.unshift(currentTrack);
+    }
+
+    currentTrack = queue.splice(index, 1)[0];
+
+    nowPlayingTitle.textContent = currentTrack.title;
+    requestedByLine.textContent = `Requested by ${currentTrack.requestedBy}`;
+    playerStatus.textContent =
+      "You are the room controller. Other users sync to your exact playback.";
+
+    showPlayer(currentTrack);
+    renderQueue();
+    renderHistory();
+  }
+
+  function playNext() {
+    if (!queue.length) {
+      playerStatus.textContent = "The shared playlist is empty.";
+      return;
+    }
+
+    playTrack(0);
+    votes = 0;
+    voteCount.textContent = "0/2";
+  }
+
+  function appendSystem(text) {
+    const message = document.createElement("article");
+    message.className = "message system";
+
+    const p = document.createElement("p");
+    p.textContent = text;
+
+    message.appendChild(p);
+    chatLog.appendChild(message);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function appendChat(text) {
+    const article = document.createElement("article");
+    article.className = "message";
+
+    const meta = document.createElement("div");
+    meta.className = "message-meta";
+
+    const author = document.createElement("strong");
+    author.textContent = session.username;
+
+    const time = document.createElement("span");
+    time.textContent = "just now";
+
+    const body = document.createElement("p");
+    body.textContent = text;
+
+    meta.append(author, time);
+    article.append(meta, body);
+
+    if (isAdmin) {
+      article.appendChild(
+        makeButton("Delete", "danger", () => {
+          article.remove();
+        })
+      );
+    }
+
+    chatLog.appendChild(article);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  requestForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const title = requestTitle.value.trim();
+    const videoId = parseYouTube(requestUrl.value);
+
+    if (!videoId) {
+      requestFeedback.textContent =
+        "Please enter a valid YouTube watch, short, embed, or youtu.be URL.";
+      return;
+    }
+
+    const request = {
+      title,
+      videoId,
+      requestedBy: session.username
+    };
+
+    pending.push(request);
+
+    requestFeedback.textContent = isAdmin
+      ? `${title} is waiting for admin approval below.`
+      : `${title} was submitted and is waiting for an admin.`;
 
     requestForm.reset();
+    renderPending();
   });
 
-  voteButton.addEventListener("click", () => {
+  chatForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const text = chatInput.value.trim();
+
+    if (!text) {
+      return;
+    }
+
+    appendChat(text);
+    chatInput.value = "";
+  });
+
+  document.getElementById("sync-button").addEventListener("click", () => {
+    followingRoom = true;
+    playerStatus.textContent = "You are synced to the room controller.";
+  });
+
+  document
+    .getElementById("independent-button")
+    .addEventListener("click", () => {
+      followingRoom = false;
+      playerStatus.textContent =
+        "Independent listening enabled. Use Sync to Controller to rejoin.";
+    });
+
+  document.getElementById("vote-button").addEventListener("click", () => {
     votes = Math.min(votes + 1, 2);
     voteCount.textContent = `${votes}/2`;
 
     if (votes >= 2) {
-      playerStatus.textContent = "Demo majority reached. The full app would advance the synchronized room.";
-      votes = 0;
-      setTimeout(() => {
-        voteCount.textContent = "0/2";
-      }, 1200);
+      appendSystem("Majority vote passed. Moving everyone to the next video.");
+      playNext();
     }
   });
 
-  document.getElementById("sync-button").addEventListener("click", () => {
-    playerStatus.textContent = "Synced with the room controller.";
+  adminNextButton.hidden = !isAdmin;
+  adminNextButton.addEventListener("click", playNext);
+
+  minimizeChat.addEventListener("click", () => {
+    const minimized = chatBody.classList.toggle("is-minimized");
+    minimizeChat.textContent = minimized ? "Open Chat" : "Minimize Chat";
   });
 
-  document.getElementById("independent-button").addEventListener("click", () => {
-    playerStatus.textContent = "Independent listening enabled. Click Sync with room to rejoin.";
+  logoutButton.addEventListener("click", () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    window.location.href = "./index.html";
   });
+
+  if (!isAdmin) {
+    controllerBadge.textContent = "Synced Room";
+    playerStatus.textContent = followingRoom
+      ? "You are synced to the room controller."
+      : "Independent listening enabled.";
+  }
+
+  renderMembers();
+  renderQueue();
+  renderPending();
+  renderHistory();
 })();
