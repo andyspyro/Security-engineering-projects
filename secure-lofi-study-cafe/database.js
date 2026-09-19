@@ -66,14 +66,63 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS audit_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
+      event_type TEXT NOT NULL DEFAULT 'legacy',
+      target_user_id INTEGER,
       action TEXT NOT NULL,
+      details TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (target_user_id) REFERENCES users(id)
     )
   `);
 
   db.run(
     `ALTER TABLE music_requests ADD COLUMN start_seconds INTEGER NOT NULL DEFAULT 0`,
+    (err) => {
+      if (err && !err.message.includes("duplicate column name")) {
+        console.error("Migration error:", err.message);
+      }
+    }
+  );
+
+  db.run(
+    `ALTER TABLE messages ADD COLUMN deleted_at DATETIME`,
+    (err) => {
+      if (err && !err.message.includes("duplicate column name")) {
+        console.error("Migration error:", err.message);
+      }
+    }
+  );
+
+  db.run(
+    `ALTER TABLE messages ADD COLUMN deleted_by INTEGER`,
+    (err) => {
+      if (err && !err.message.includes("duplicate column name")) {
+        console.error("Migration error:", err.message);
+      }
+    }
+  );
+
+  db.run(
+    `ALTER TABLE audit_logs ADD COLUMN event_type TEXT NOT NULL DEFAULT 'legacy'`,
+    (err) => {
+      if (err && !err.message.includes("duplicate column name")) {
+        console.error("Migration error:", err.message);
+      }
+    }
+  );
+
+  db.run(
+    `ALTER TABLE audit_logs ADD COLUMN target_user_id INTEGER`,
+    (err) => {
+      if (err && !err.message.includes("duplicate column name")) {
+        console.error("Migration error:", err.message);
+      }
+    }
+  );
+
+  db.run(
+    `ALTER TABLE audit_logs ADD COLUMN details TEXT`,
     (err) => {
       if (err && !err.message.includes("duplicate column name")) {
         console.error("Migration error:", err.message);
