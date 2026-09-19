@@ -1,6 +1,6 @@
 {
   "name": "secure-lofi-study-cafe",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "A secure lo-fi study cafe chat application with authentication, role based access control, live chat, and admin approved music requests.",
   "main": "server.js",
   "scripts": {
