@@ -235,9 +235,97 @@ The full live multi-user behavior belongs to the Node.js/Socket.IO application. 
 
 For a production deployment, sensible next iterations would include:
 
-1. Persisting avatar preference in the user profile while continuing to keep movement ephemeral.
+1. Persisting the selected color/avatar theme in addition to the now-persistent profile picture.
 2. Adding optional user status such as "studying", "break", or "listening".
 3. Adding room capacity and multiple study rooms.
 4. Adding an explicit animation toggle in addition to operating-system reduced-motion support.
 5. Running automated accessibility checks such as axe-core in CI.
 6. Adding end-to-end viewport tests for 320 px mobile, tablet, and desktop layouts.
+
+
+## Profile pictures
+
+Users can now upload a profile picture for their café avatar.
+
+### Full Node application
+
+The profile picture is persisted with the user account in SQLite and is included in live Socket.IO presence updates so other connected members can see it.
+
+The upload path is intentionally constrained:
+
+* accepted formats: PNG, JPEG, and WebP only;
+* maximum decoded file size: 512 KB;
+* SVG is rejected;
+* the server validates both the data-URL MIME type and the binary file signature before accepting the image;
+* the normalized image is stored as account profile data;
+* only the fact that a profile image was updated or removed is written to the audit log — the image itself is not copied into audit records.
+
+This avoids introducing an unrestricted filesystem upload endpoint while still providing persistent profile imagery.
+
+### GitHub Pages demo
+
+Because GitHub Pages has no backend database, the demo stores the selected profile image in that browser's local storage. It is therefore a portfolio demonstration of the UI rather than a multi-user persistent upload service.
+
+## Smoother walking
+
+Avatar movement was changed from discrete five-unit jumps to an animation-loop movement model.
+
+Users can now:
+
+* hold WASD;
+* hold the arrow keys;
+* press and hold the on-screen movement controls;
+* click or tap a destination and watch the avatar walk toward it.
+
+Movement is calculated from elapsed animation-frame time, which produces a consistent walking speed instead of depending on keyboard repeat rate.
+
+The live Node application throttles outgoing Socket.IO movement updates while keeping the local animation smooth. This reduces unnecessary network traffic while other users still receive frequent position updates.
+
+A subtle walking/bobbing animation is applied while movement is active. It is disabled under `prefers-reduced-motion: reduce`.
+
+## Avatar speech bubbles
+
+Live chat is now connected visually to the Café Floor.
+
+When a user sends a chat message:
+
+1. the normal chat record appears in Study Chat;
+2. the same displayed message temporarily appears in a speech bubble above that user's avatar;
+3. the bubble disappears automatically after approximately five seconds.
+
+For non-admin users, the speech bubble uses the already-censored message returned by the server, so profanity filtering is not bypassed by the avatar UI.
+
+Speech-bubble text is inserted with `textContent`, not HTML, which preserves the application's XSS-resistant rendering model.
+
+## Additional files and schema changes
+
+* `database.js`
+  * added the `users.avatar_image` profile field and migration.
+
+* `schema.sql`
+  * documents the profile-image field.
+
+* `server.js`
+  * validates and persists profile image data;
+  * exposes profile imagery through presence state;
+  * accepts profile-image update/removal events;
+  * preserves transient avatar movement as non-audited room state.
+
+* `views/cafe.ejs`
+  * added profile-picture upload/removal controls.
+
+* `public/cafe.js`
+  * added profile-image rendering;
+  * added continuous walking and click-to-walk behavior;
+  * throttles live movement updates;
+  * added temporary avatar speech bubbles.
+
+* `demo/cafe.html` and `demo/demo.js`
+  * mirror the new profile, walking, and speech-bubble experience for the static portfolio build.
+
+* `public/style.css`
+  * added circular/cropped profile images;
+  * walking animation;
+  * speech-bubble styling;
+  * responsive upload controls;
+  * reduced-motion overrides for the new animations.
