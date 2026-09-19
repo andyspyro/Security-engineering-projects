@@ -82,6 +82,33 @@
   let votes = 0;
   let followingRoom = true;
 
+  const BLOCKED_WORDS = [
+    "fuck",
+    "fucking",
+    "fucked",
+    "shit",
+    "bitch",
+    "asshole",
+    "dick"
+  ];
+
+  function escapeRegex(value) {
+    return value.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\  let votes = 0;
+  let followingRoom = true;
+
+");
+  }
+
+  function censorBadWords(text) {
+    let cleanText = String(text || "");
+
+    for (const word of BLOCKED_WORDS) {
+      const regex = new RegExp("\\b" + escapeRegex(word) + "\\b", "gi");
+      cleanText = cleanText.replace(regex, "*".repeat(word.length));
+    }
+
+    return cleanText;
+  }
   function makeButton(label, className, handler) {
     const button = document.createElement("button");
     button.type = "button";
@@ -418,7 +445,7 @@
     time.textContent = "just now";
 
     const body = document.createElement("p");
-    body.textContent = text;
+    body.textContent = censorBadWords(text);
 
     meta.append(author, time);
     article.append(meta, body);
