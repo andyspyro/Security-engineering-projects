@@ -1,3 +1,5 @@
 node_modules
 .env
-lofi_cafe.db
+*.db
+*.db-wal
+*.db-shm
