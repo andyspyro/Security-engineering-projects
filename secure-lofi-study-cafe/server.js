@@ -406,8 +406,18 @@ app.use((req, res, next) => {
   next();
 });
 
+// Apply the same Express session store directly to Engine.IO so HTTP polling
+// and WebSocket upgrades resolve the same authenticated server-side session.
+io.engine.use(sessionMiddleware);
+
 io.use((socket, next) => {
-  sessionMiddleware(socket.request, {}, next);
+  const userSession = socket.request.session;
+
+  if (!userSession || !userSession.user) {
+    return next(new Error("authentication required"));
+  }
+
+  next();
 });
 
 /* -------------------------
@@ -2550,6 +2560,29 @@ app.get(
    Socket.IO
 ------------------------- */
 
+async function buildRoomSnapshot(user) {
+  const snapshot = {
+    serverNow: Date.now(),
+    members: getMembersList(),
+    playerState: await getPlayerState(),
+    vote: getVoteState(),
+    controller: getControllerPublicState(),
+    pendingRequests: []
+  };
+
+  if (isModerator(user)) {
+    snapshot.pendingRequests = await getPendingRequests();
+  }
+
+  return snapshot;
+}
+
+async function sendRoomSnapshot(socket, user) {
+  const snapshot = await buildRoomSnapshot(user);
+  socket.emit("room:snapshot", snapshot);
+  return snapshot;
+}
+
 io.on("connection", async (socket) => {
   const userSession = socket.request.session;
 
@@ -2585,24 +2618,26 @@ io.on("connection", async (socket) => {
   }).catch((err) => console.error("Socket connection security log error:", err));
 
   try {
-    socket.emit("player:state", await getPlayerState());
-    socket.emit("presence:update", {
-      members: getMembersList()
-    });
-    socket.emit("vote:update", getVoteState());
-    socket.emit("controller:update", {
-      controller: getControllerPublicState(),
-      serverNow: Date.now()
-    });
-
-    if (isModerator(user)) {
-      socket.emit("requests:update", {
-        pendingRequests: await getPendingRequests()
-      });
-    }
+    // Broadcast the new membership to every connected browser, then send a
+    // complete authoritative snapshot to the joining client.
+    emitPresence();
+    await sendRoomSnapshot(socket, user);
   } catch (err) {
-    console.error("Initial socket state error:", err);
+    console.error("Initial room synchronization error:", err);
   }
+
+  socket.on("room:sync-request", async (acknowledge) => {
+    const reply =
+      typeof acknowledge === "function" ? acknowledge : () => {};
+
+    try {
+      const snapshot = await buildRoomSnapshot(user);
+      reply({ ok: true, snapshot });
+    } catch (err) {
+      console.error("Room resynchronization error:", err);
+      reply({ ok: false, error: "Room synchronization failed." });
+    }
+  });
 
   socket.on("chat:send", async (data) => {
     try {
