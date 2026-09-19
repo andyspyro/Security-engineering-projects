@@ -1,6 +1,10 @@
 const sqlite3 = require("sqlite3").verbose();
 
-const DB_PATH = process.env.DB_PATH || "./lofi_cafe.db";
+const DB_PATH =
+  process.env.DB_PATH ||
+  (process.env.NODE_ENV === "production"
+    ? "/data/lofi_cafe.db"
+    : "./lofi_cafe.db");
 
 const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
