@@ -1,0 +1,65 @@
+name: Deploy Secure Lo-Fi Study Cafe demo
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "secure-lofi-study-cafe/demo/**"
+      - "secure-lofi-study-cafe/public/styles.css"
+      - ".github/workflows/secure-lofi-study-cafe-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build static demo
+        shell: bash
+        run: |
+          mkdir -p _site/secure-lofi-study-cafe
+          cp secure-lofi-study-cafe/demo/index.html _site/secure-lofi-study-cafe/index.html
+          cp secure-lofi-study-cafe/demo/demo.js _site/secure-lofi-study-cafe/demo.js
+          cp secure-lofi-study-cafe/public/styles.css _site/secure-lofi-study-cafe/styles.css
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta http-equiv="refresh" content="0; url=./secure-lofi-study-cafe/">
+            <title>Secure Lo-Fi Study Cafe</title>
+          </head>
+          <body>
+            <p><a href="./secure-lofi-study-cafe/">Open the Secure Lo-Fi Study Cafe demo</a></p>
+          </body>
+          </html>
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
