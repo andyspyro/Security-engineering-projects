@@ -513,6 +513,22 @@
       const card = document.createElement("div");
       card.className = "member-card";
 
+      const identity = document.createElement("div");
+      identity.className = "member-identity";
+
+      const thumb = document.createElement("span");
+      thumb.className = `member-thumb avatar-${member.avatarStyle || "latte"}`;
+
+      if (member.avatarImage) {
+        const image = document.createElement("img");
+        image.src = member.avatarImage;
+        image.alt = "";
+        image.loading = "lazy";
+        thumb.appendChild(image);
+      } else {
+        thumb.textContent = avatarGlyph(member.avatarStyle || "latte");
+      }
+
       const left = document.createElement("div");
 
       const name = document.createElement("div");
@@ -526,6 +542,7 @@
       status.textContent = member.status;
 
       left.append(name, status);
+      identity.append(thumb, left);
 
       const right = document.createElement("div");
       right.className = "list-actions";
@@ -588,7 +605,7 @@
         );
       }
 
-      card.append(left, right);
+      card.append(identity, right);
       membersList.appendChild(card);
     });
   }
