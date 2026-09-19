@@ -1,0 +1,39 @@
+[Unit]
+Description=Secure Lo-Fi Study Cafe
+Documentation=https://github.com/andyspyro/Security-engineering-projects/tree/main/secure-lofi-study-cafe
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=securelofi
+Group=securelofi
+WorkingDirectory=/opt/secure-lofi-study-cafe
+EnvironmentFile=/etc/secure-lofi-study-cafe/secure-lofi.env
+ExecStart=/usr/bin/node /opt/secure-lofi-study-cafe/server.js
+
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/secure-lofi-study-cafe
+
+[Install]
+WantedBy=multi-user.target
