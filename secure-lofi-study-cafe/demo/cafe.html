@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Secure Lo-Fi Study Cafe portfolio demo">
+  <title>Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Secure Study Room</p>
+      <h1>Secure Lo-Fi Study Café</h1>
+      <p class="session-line">Logged in as <strong id="session-username">—</strong> &nbsp;|&nbsp; Role: <strong id="session-role">—</strong></p>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="logout-button" class="button secondary small" type="button">Logout</button>
+    </div>
+  </header>
+
+  <div class="demo-strip">
+    <div>
+      Portfolio demo mode: this page recreates the original interface and interaction flow in the browser. The real Node.js project in the repository handles sessions, bcrypt, SQLite, CSRF, RBAC, Socket.IO, moderation, and audit logging on the server.
+    </div>
+  </div>
+
+  <main class="cafe-grid">
+    <div class="player-column">
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Shared Player</p>
+            <h2>Lo-Fi Study Music</h2>
+          </div>
+          <span id="controller-badge" class="badge">Synced Room</span>
+        </div>
+
+        <div class="player-meta">
+          <div>Room Track: <strong id="now-playing-title">Not playing</strong></div>
+          <div id="requested-by-line">Requested by —</div>
+          <div id="controller-line">Room controller: <span id="controller-name">—</span>.</div>
+          <div id="player-status" class="controller-message">You are synced to the room controller.</div>
+        </div>
+
+        <div id="demo-player" class="player-frame">
+          <div style="display:grid;place-items:center;height:100%;text-align:center;padding:1rem;color:#efcfac">
+            <div>
+              <strong style="display:block;color:#fff8ef;font-size:1.2rem;margin-bottom:.4rem">No track selected</strong>
+              Request a YouTube video below, then use Play Now from the shared playlist.
+            </div>
+          </div>
+        </div>
+
+        <div class="player-actions">
+          <button id="sync-button" class="button primary" type="button">Sync to Controller</button>
+          <button id="independent-button" class="button secondary" type="button">Listen Independently</button>
+          <button id="vote-button" class="button secondary" type="button">Vote Next</button>
+          <button id="admin-next-button" class="button secondary" type="button">Admin Play Next</button>
+        </div>
+
+        <p class="compact">Vote next: <span id="vote-count">0/2</span> needed. Members online: <span id="inline-member-count">3</span>.</p>
+        <p class="compact">If the browser pauses while you switch apps, the room will automatically sync back when you return.</p>
+
+        <div class="section-rule"></div>
+
+        <h3>Shared Playlist</h3>
+        <p class="compact">Everyone sees this queue. Admin/mod can rearrange it.</p>
+        <div id="queue-list" class="list-stack">
+          <p class="muted">Nothing is queued yet.</p>
+        </div>
+
+        <div class="section-rule"></div>
+
+        <h3>Request Music</h3>
+        <p class="compact">Paste a YouTube video link. An admin must approve it before it plays.</p>
+
+        <form id="request-form" class="request-form">
+          <label>
+            Track title
+            <input id="request-title" maxlength="100" placeholder="Track title" required>
+          </label>
+
+          <label>
+            YouTube URL
+            <input id="request-url" maxlength="1500" placeholder="https://www.youtube.com/watch?v=…" required>
+          </label>
+
+          <div>
+            <button class="button primary" type="submit">Request Song</button>
+          </div>
+        </form>
+
+        <div id="request-feedback" class="compact" aria-live="polite"></div>
+
+        <div class="section-rule"></div>
+
+        <details>
+          <summary>Last Played</summary>
+          <div id="history-list" class="list-stack" style="margin-top:.8rem">
+            <p class="muted">No tracks have played yet.</p>
+          </div>
+        </details>
+
+        <div id="pending-section" hidden>
+          <div class="section-rule"></div>
+          <details open>
+            <summary>Pending Music Requests</summary>
+            <div id="pending-list" class="list-stack" style="margin-top:.8rem"></div>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <div class="chat-column">
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Live Room</p>
+            <h2>Study Chat</h2>
+          </div>
+
+          <div class="chat-toolbar">
+            <span class="badge live">Live</span>
+            <button id="minimize-chat" class="button secondary small" type="button">Minimize Chat</button>
+          </div>
+        </div>
+
+        <div id="chat-body" class="chat-body">
+          <div class="section-rule"></div>
+
+          <section class="member-section">
+            <h3>Members in Room</h3>
+            <div id="members-list" class="list-stack"></div>
+          </section>
+
+          <form id="chat-form" class="chat-form">
+            <label class="sr-only" for="chat-input">Study message</label>
+            <input id="chat-input" maxlength="500" autocomplete="off" placeholder="Type a study message…" required>
+            <button class="button primary" type="submit">Send</button>
+          </form>
+
+          <p class="compact">Messages are censored for blocked words and displayed as text to reduce script injection risk.</p>
+
+          <div id="chat-log" class="chat-log" aria-live="polite" style="margin-top:1rem">
+            <article class="message system"><p>Test joined the room.</p></article>
+            <article class="message system"><p>Admin joined the room.</p></article>
+            <article class="message">
+              <div class="message-meta">
+                <strong>Test</strong>
+                <span>just now</span>
+              </div>
+              <p>Ready for a focus session.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="./demo.js"></script>
+</body>
+</html>
