@@ -2,9 +2,37 @@
 
 > **Type:** Full stack secure web application  
 > **Stack:** Node.js, Express, SQLite, EJS, Socket.IO  
-> **Status:** Core backend and database source retained
+> **Status:** Runnable full-stack app with a GitHub Pages UI demo
 
-I built this as a study room app where people could sign in, chat, request music, and share a synchronized player. I also wanted the security controls to be part of the app itself instead of something I added at the end.
+I built this as a study room app where people can sign in, chat, request music, and share a synchronized player. I also wanted the security controls to be part of the app itself instead of something I added at the end.
+
+## Live UI demo
+
+**GitHub Pages:** https://andyspyro.github.io/Security-engineering-projects/secure-lofi-study-cafe/
+
+The Pages build is a safe static demonstration of the actual interface. GitHub Pages cannot run the Node.js server, SQLite database, sessions, or Socket.IO backend, so the security and real-time controls are demonstrated by the full application source below rather than faked as production security in the static preview.
+
+## Run the full application locally
+
+```bash
+cd secure-lofi-study-cafe
+npm install
+cp .env.example .env
+```
+
+Replace the example `SESSION_SECRET` in `.env` with a long random value. One way to generate one is:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Then start the application:
+
+```bash
+npm start
+```
+
+Open `http://localhost:3000`.
 
 ## What the app does
 
@@ -29,18 +57,18 @@ I built this as a study room app where people could sign in, chat, request music
 | CSRF | State changing actions require a session token |
 | SQL safety | Queries use placeholders instead of joining user input into SQL |
 | Input validation | Registration, chat, titles, and media input have format or length checks |
-| XSS reduction | Live chat output is treated as text instead of trusted HTML |
+| XSS reduction | EJS escapes normal output and live chat uses `textContent` instead of trusted HTML |
 | Rate limiting | Authentication routes have tighter limits than normal traffic |
 | Security headers | Helmet sets browser security headers and a content security policy |
 | Auditability | Admin and moderation actions are written to the audit table |
 
 ## One part I paid attention to
 
-The music request field could accept a YouTube URL, but I did not want the server to trust arbitrary iframe code.
+The music request field can accept a YouTube URL, but I did not want the server to trust arbitrary iframe code.
 
 The backend extracts the video ID, checks the host and ID format, reads the optional starting time, and then rebuilds the media target from known values.
 
-That kept the feature useful without accepting arbitrary embed markup.
+That keeps the feature useful without accepting arbitrary embed markup.
 
 ## Architecture
 
@@ -68,7 +96,16 @@ Browser and EJS views
         audit logs
 ```
 
-## Proof in this folder
+## Frontend restored in this repository
+
+* [views/register.ejs](views/register.ejs) renders account registration.
+* [views/login.ejs](views/login.ejs) renders authentication.
+* [views/cafe.ejs](views/cafe.ejs) renders the live study-room dashboard.
+* [public/styles.css](public/styles.css) contains the responsive interface.
+* [public/cafe.js](public/cafe.js) handles Socket.IO state, chat, presence, queue updates, voting, and player synchronization.
+* [demo/](demo/) contains the static GitHub Pages preview.
+
+## Backend proof in this folder
 
 * [server.js](server.js) contains the Express routes, sessions, authorization checks, CSRF checks, rate limiting, Socket.IO logic, and player controls.
 * [database.js](database.js) contains the SQLite setup and query helpers.
@@ -80,4 +117,6 @@ Browser and EJS views
 
 The working database and local environment file are not published. The public repo excludes user records, passwords, session data, and local secrets.
 
-The demo bootstrap still makes the first registered account an administrator. That is convenient for local testing, but I would not use that pattern for a public production deployment.
+For local development, the first registered account becomes an administrator. That bootstrap behavior is convenient for a private demo but should be replaced with an explicit administrator provisioning process before exposing the full Node.js application to untrusted public users.
+
+The GitHub Pages version is intentionally static and does not expose the backend database or authentication system.
