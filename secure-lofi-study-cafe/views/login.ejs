@@ -3,39 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in | Secure Lo-Fi Study Cafe</title>
-  <link rel="stylesheet" href="/styles.css">
+  <title>Welcome Back | Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body class="auth-page">
   <main class="auth-shell">
     <section class="auth-card" aria-labelledby="login-title">
-      <div class="brand-mark" aria-hidden="true">♫</div>
-      <p class="eyebrow">Secure study room</p>
-      <h1 id="login-title">Welcome back</h1>
-      <p class="muted">Sign in to the shared study cafe.</p>
+      <div class="cafe-icon" aria-hidden="true">☕</div>
+      <h1 id="login-title">Welcome Back</h1>
+      <p class="auth-subtitle">Log in to enter your cozy study room.</p>
 
       <% if (errors && errors.length) { %>
         <div class="alert" role="alert">
-          <strong>Unable to sign in:</strong>
-          <ul>
-            <% errors.forEach((error) => { %><li><%= error %></li><% }) %>
-          </ul>
+          <% errors.forEach((error) => { %>
+            <div><%= error %></div>
+          <% }) %>
         </div>
       <% } %>
 
       <form method="post" action="/login" class="stack-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <label>Username
+
+        <label>
+          Username
           <input name="username" autocomplete="username" required>
         </label>
-        <label>Password
-          <input type="password" name="password" autocomplete="current-password" required>
-        </label>
-        <button class="button primary" type="submit">Sign in</button>
-      </form>
 
-      <p class="auth-switch">Need an account? <a href="/register">Create one</a></p>
-      <p class="security-note">The server validates credentials, enforces rate limits, and keeps authentication state in the session.</p>
+        <label>
+          Password
+          <input type="password" name="password" autocomplete="current-password" placeholder="Your password" required>
+        </label>
+
+        <div>
+          <button class="button primary" type="submit">Log In</button>
+        </div>
+
+        <p class="auth-switch">Need an account? <a href="/register">Register</a></p>
+      </form>
     </section>
   </main>
 </body>
