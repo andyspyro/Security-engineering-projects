@@ -35,6 +35,7 @@ jobs:
           node --check server.js
           node --check database.js
           node --check public/cafe.js
+          node --check demo/auth.js
           node --check demo/demo.js
 
       - name: Compile EJS templates
