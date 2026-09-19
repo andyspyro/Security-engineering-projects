@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Secure Lo-Fi Study Cafe interactive security showcase">
   <title>Secure Lo-Fi Study Cafe</title>
-  <link rel="stylesheet" href="./style.css?v=3.1.1">
+  <link rel="stylesheet" href="./style.css?v=4.0.1">
 </head>
 <body>
   <header class="topbar">
@@ -65,7 +65,7 @@
           <button id="admin-next-button" class="button secondary" type="button">Admin Play Next</button>
         </div>
 
-        <p class="compact">Vote next: <span id="vote-count">0/2</span> needed. Members online: <span id="inline-member-count">3</span>.</p>
+        <p class="compact">Vote next: <span id="vote-count">0/2</span> needed. Members in this preview: <span id="inline-member-count">1</span>.</p>
         <p class="compact">If the browser pauses while you switch apps, the room will automatically sync back when you return.</p>
 
         <div class="section-rule"></div>
@@ -126,7 +126,7 @@
             <h2>Café Floor</h2>
             <p class="compact">Move your avatar around the room. New members appear here automatically.</p>
           </div>
-          <span class="badge live"><span id="floor-member-count">3</span> here</span>
+          <span class="badge"><span id="floor-member-count">1</span> preview</span>
         </div>
 
         <div id="avatar-stage" class="avatar-stage" tabindex="0" aria-label="Interactive café floor. Hold arrow keys or WASD to walk, or click a destination.">
@@ -178,7 +178,7 @@
           </div>
 
           <div class="chat-toolbar">
-            <span class="badge live">Live</span>
+            <span class="badge">Static Preview</span>
             <button id="minimize-chat" class="button secondary small" type="button">Minimize Chat</button>
           </div>
         </div>
@@ -200,14 +200,8 @@
           <p class="compact">Regular-user messages are censored in the live room. Submitted chat text and application activity are retained in the admin audit log for moderation and accountability.</p>
 
           <div id="chat-log" class="chat-log" aria-live="polite" style="margin-top:1rem">
-            <article class="message system"><p>Test joined the room.</p></article>
-            <article class="message system"><p>Admin joined the room.</p></article>
-            <article class="message">
-              <div class="message-meta">
-                <strong>Test</strong>
-                <span>just now</span>
-              </div>
-              <p>Ready for a focus session.</p>
+            <article class="message system">
+              <p>This static page does not receive users from other devices. Realtime members and chat appear on the self-hosted server.</p>
             </article>
           </div>
         </div>
@@ -215,6 +209,6 @@
     </div>
   </main>
 
-  <script src="./demo.js?v=3.1.1"></script>
+  <script src="./demo.js?v=4.0.1"></script>
 </body>
 </html>
