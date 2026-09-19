@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Secure Lo-Fi Study Cafe admin audit console">
+  <title>Admin Console | Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="admin-page">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Permanent Admin</p>
+      <h1>Administration & Audit Console</h1>
+      <p class="session-line">
+        Signed in as <strong id="admin-username">—</strong>.
+      </p>
+    </div>
+
+    <div class="topbar-actions">
+      <a class="button secondary small" href="./cafe.html">Back to Café</a>
+      <button id="download-report" class="button primary small" type="button">Download CSV Report</button>
+      <button id="logout-button" class="button secondary small" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="admin-shell">
+    <section class="admin-stat-grid" aria-label="Audit summary">
+      <article class="admin-stat">
+        <span>Accounts</span>
+        <strong id="stat-users">0</strong>
+      </article>
+      <article class="admin-stat">
+        <span>Audit events</span>
+        <strong id="stat-events">0</strong>
+      </article>
+      <article class="admin-stat">
+        <span>Chat events</span>
+        <strong id="stat-chat">0</strong>
+      </article>
+      <article class="admin-stat">
+        <span>Music events</span>
+        <strong id="stat-music">0</strong>
+      </article>
+      <article class="admin-stat">
+        <span>Admin events</span>
+        <strong id="stat-admin">0</strong>
+      </article>
+    </section>
+
+    <section class="panel admin-policy">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Privacy Boundary</p>
+          <h2>Administrative visibility</h2>
+        </div>
+      </div>
+      <p>
+        The admin console is limited to activity generated inside the study café:
+        usernames, account roles, timestamps, chat activity, music requests, queue
+        actions, controller changes, votes, and moderation actions.
+      </p>
+      <p class="compact">
+        Passwords, password verifiers, session data, browser history, precise location,
+        and unrelated device information are not shown in the report.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Search</p>
+          <h2>Filter audit records</h2>
+        </div>
+      </div>
+      <label class="admin-search-label" for="admin-search">
+        Search by username, event, action, or content
+        <input id="admin-search" type="search" placeholder="Search audit records…">
+      </label>
+    </section>
+
+    <section class="panel admin-section" data-admin-section>
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Accounts</p>
+          <h2>User Directory</h2>
+        </div>
+        <span class="badge admin">admin only</span>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Registered</th>
+            </tr>
+          </thead>
+          <tbody id="account-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel admin-section" data-admin-section>
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Audit Trail</p>
+          <h2>Application Activity</h2>
+        </div>
+        <span id="audit-count-badge" class="badge">0 shown</span>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Actor</th>
+              <th>Role</th>
+              <th>Event</th>
+              <th>Action</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="./admin-demo.js"></script>
+</body>
+</html>
