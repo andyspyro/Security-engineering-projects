@@ -83,20 +83,14 @@
   let followingRoom = true;
 
   const BLOCKED_WORDS = [
-    "fuck",
-    "fucking",
-    "fucked",
-    "shit",
-    "bitch",
-    "asshole",
-    "dick"
+    "fuck", "fucking", "fucked", "fucker", "fuckers",
+    "motherfucker", "motherfuckers", "shit", "shitty", "bullshit",
+    "bitch", "bitches", "asshole", "assholes", "dick", "dicks",
+    "cunt", "cunts", "bastard", "bastards"
   ];
 
   function escapeRegex(value) {
-    return value.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\  let votes = 0;
-  let followingRoom = true;
-
-");
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   function censorBadWords(text) {
@@ -109,6 +103,7 @@
 
     return cleanText;
   }
+
   function makeButton(label, className, handler) {
     const button = document.createElement("button");
     button.type = "button";
@@ -445,7 +440,7 @@
     time.textContent = "just now";
 
     const body = document.createElement("p");
-    body.textContent = censorBadWords(text);
+    body.textContent = isAdmin ? text : censorBadWords(text);
 
     meta.append(author, time);
     article.append(meta, body);
