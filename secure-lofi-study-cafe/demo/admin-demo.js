@@ -155,6 +155,20 @@
   }
 
   function downloadReport() {
+    let currentAudit = loadArray(AUDIT_KEY);
+
+    currentAudit.push({
+      timestamp: new Date().toISOString(),
+      eventType: "admin.report_export",
+      actor: session.username,
+      role: session.role,
+      action: "Downloaded CSV audit report",
+      details: {}
+    });
+
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(currentAudit.slice(-1000)));
+    audit.push(currentAudit[currentAudit.length - 1]);
+
     const header = [
       "timestamp",
       "actor",
@@ -166,7 +180,7 @@
 
     const rows = [
       header.map(escapeCsv).join(","),
-      ...audit.map((entry) =>
+      ...currentAudit.map((entry) =>
         [
           entry.timestamp || "",
           entry.actor || "system",
