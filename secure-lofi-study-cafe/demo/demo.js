@@ -1066,8 +1066,13 @@
     }
   });
 
-  adminNextButton.hidden = !isAdmin;
-  adminNextButton.addEventListener("click", playNext);
+  if (isAdmin) {
+    adminNextButton.hidden = false;
+    adminNextButton.addEventListener("click", playNext);
+  } else {
+    adminNextButton.remove();
+    pendingSection.remove();
+  }
 
   minimizeChat.addEventListener("click", () => {
     const minimized = chatBody.classList.toggle("is-minimized");
