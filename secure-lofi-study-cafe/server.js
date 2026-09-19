@@ -230,6 +230,50 @@ app.use((req, res, next) => {
   req.requestId = crypto.randomUUID();
   req.sessionRef = makeSessionRef(req.sessionID);
   res.setHeader("X-Request-ID", req.requestId);
+
+  const startedAt = process.hrtime.bigint();
+
+  res.on("finish", () => {
+    const elapsedNanoseconds = process.hrtime.bigint() - startedAt;
+    const durationMs = Number(elapsedNanoseconds / BigInt(1e6));
+    const statusCode = res.statusCode;
+
+    const severity =
+      statusCode >= 500
+        ? "HIGH"
+        : statusCode >= 400
+          ? "NOTICE"
+          : "INFO";
+
+    const outcome =
+      statusCode >= 500
+        ? "failed"
+        : statusCode >= 400
+          ? "blocked"
+          : "success";
+
+    writeSecurityEvent({
+      eventType: "http.request",
+      severity,
+      actorUserId:
+        req.session && req.session.user ? req.session.user.id : null,
+      usernameSnapshot:
+        req.session && req.session.user ? req.session.user.username : null,
+      outcome,
+      httpMethod: req.method,
+      route:
+        req.route && req.route.path
+          ? String(req.route.path)
+          : String(req.path || ""),
+      requestId: req.requestId,
+      sessionRef: makeSessionRef(req.sessionID),
+      metadata: {
+        statusCode,
+        durationMs
+      }
+    }).catch((err) => console.error("HTTP security log error:", err));
+  });
+
   next();
 });
 
@@ -1379,6 +1423,10 @@ app.get("/profile-image/:id", requireLogin, async (req, res) => {
     console.error("Profile image read error:", err);
     res.status(500).end();
   }
+});
+
+app.get("/security", requireLogin, (req, res) => {
+  res.render("security");
 });
 
 app.get("/cafe", requireLogin, async (req, res) => {
