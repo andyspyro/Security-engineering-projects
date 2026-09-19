@@ -16,7 +16,12 @@
     return;
   }
 
-  const isAdmin = session.role === "admin";
+  const isAdmin =
+    String(session.username || "").toLowerCase() === "admin" &&
+    session.role === "admin";
+
+  session.role = isAdmin ? "admin" : "user";
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   const AUDIT_KEY = "secureLofiDemoAudit";
 
   function logAudit(eventType, action, details = {}) {
