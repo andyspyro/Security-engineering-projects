@@ -249,6 +249,44 @@ function censorBadWords(text) {
 }
 
 /* -------------------------
+   Audit logging
+------------------------- */
+
+async function writeAudit(
+  userId,
+  eventType,
+  action,
+  { targetUserId = null, details = null } = {}
+) {
+  const safeDetails =
+    details === null || details === undefined
+      ? null
+      : typeof details === "string"
+        ? details.slice(0, 4000)
+        : JSON.stringify(details).slice(0, 4000);
+
+  await db.run(
+    `
+    INSERT INTO audit_logs
+      (user_id, event_type, target_user_id, action, details)
+    VALUES (?, ?, ?, ?, ?)
+    `,
+    [
+      userId || null,
+      String(eventType || "activity").slice(0, 80),
+      targetUserId || null,
+      String(action || "").slice(0, 500),
+      safeDetails
+    ]
+  );
+}
+
+function csvCell(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+/* -------------------------
    YouTube parser
 ------------------------- */
 
@@ -842,9 +880,16 @@ app.post(
 
       const passwordHash = await bcrypt.hash(password, 12);
 
-      await db.run(
+      const createdUser = await db.run(
         "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
         [username, passwordHash, role]
+      );
+
+      await writeAudit(
+        createdUser.lastID,
+        "account.register",
+        `Account registered as ${role}`,
+        { details: { username, role } }
       );
 
       res.redirect("/login");
@@ -903,6 +948,13 @@ app.post(
         role: user.role
       };
 
+      await writeAudit(
+        user.id,
+        "auth.login",
+        "Successful login",
+        { details: { role: user.role } }
+      );
+
       res.redirect("/cafe");
     } catch (err) {
       console.error("Login error:", err);
@@ -914,7 +966,17 @@ app.post(
   }
 );
 
-app.post("/logout", verifyCsrf, (req, res) => {
+app.post("/logout", verifyCsrf, async (req, res) => {
+  const user = req.session.user;
+
+  if (user) {
+    try {
+      await writeAudit(user.id, "auth.logout", "User logged out");
+    } catch (err) {
+      console.error("Logout audit error:", err);
+    }
+  }
+
   req.session.destroy(() => {
     res.redirect("/login");
   });
@@ -932,6 +994,7 @@ app.get("/cafe", requireLogin, async (req, res) => {
              users.role AS user_role
       FROM messages
       JOIN users ON messages.user_id = users.id
+      WHERE messages.deleted_at IS NULL
       ORDER BY messages.created_at DESC
       LIMIT 50
       `
@@ -1009,7 +1072,7 @@ app.post(
     }
 
     try {
-      await db.run(
+      const musicRequest = await db.run(
         `
         INSERT INTO music_requests (user_id, title, url, video_id, start_seconds)
         VALUES (?, ?, ?, ?, ?)
@@ -1021,6 +1084,19 @@ app.post(
           parsedVideo.videoId,
           parsedVideo.startSeconds
         ]
+      );
+
+      await writeAudit(
+        req.session.user.id,
+        "music.request",
+        `Submitted music request ID ${musicRequest.lastID}`,
+        {
+          details: {
+            requestId: musicRequest.lastID,
+            title,
+            videoId: parsedVideo.videoId
+          }
+        }
       );
 
       await emitPendingRequests();
@@ -1435,11 +1511,39 @@ app.post(
     try {
       const messageId = req.params.id;
 
-      await db.run("DELETE FROM messages WHERE id = ?", [messageId]);
+      const message = await db.get(
+        `
+        SELECT messages.id,
+               messages.user_id,
+               messages.message_text,
+               users.username
+        FROM messages
+        JOIN users ON messages.user_id = users.id
+        WHERE messages.id = ? AND messages.deleted_at IS NULL
+        `,
+        [messageId]
+      );
+
+      if (!message) {
+        return res.status(404).send("Message not found.");
+      }
 
       await db.run(
-        "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-        [req.session.user.id, `Deleted message ID ${messageId}`]
+        "UPDATE messages SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ? WHERE id = ?",
+        [req.session.user.id, messageId]
+      );
+
+      await writeAudit(
+        req.session.user.id,
+        "chat.delete",
+        `Deleted message ID ${messageId} from ${message.username}`,
+        {
+          targetUserId: message.user_id,
+          details: {
+            messageId: Number(messageId),
+            messageText: message.message_text
+          }
+        }
       );
 
       io.emit("chat:deleted", {
@@ -1449,6 +1553,253 @@ app.post(
       res.redirect("/cafe");
     } catch (err) {
       console.error("Admin delete error:", err);
+      res.status(500).send("Something went wrong.");
+    }
+  }
+);
+
+
+/* -------------------------
+   Permanent admin console
+------------------------- */
+
+app.get("/admin", requireLogin, requirePermanentAdmin, async (req, res) => {
+  try {
+    const users = await db.all(
+      `
+      SELECT users.id,
+             users.username,
+             users.role,
+             users.created_at,
+             COUNT(messages.id) AS message_count
+      FROM users
+      LEFT JOIN messages ON messages.user_id = users.id
+      GROUP BY users.id
+      ORDER BY users.created_at ASC
+      `
+    );
+
+    const auditLogs = await db.all(
+      `
+      SELECT audit_logs.id,
+             audit_logs.event_type,
+             audit_logs.action,
+             audit_logs.details,
+             audit_logs.created_at,
+             actor.username AS actor_username,
+             target.username AS target_username
+      FROM audit_logs
+      LEFT JOIN users AS actor ON audit_logs.user_id = actor.id
+      LEFT JOIN users AS target ON audit_logs.target_user_id = target.id
+      ORDER BY audit_logs.created_at DESC, audit_logs.id DESC
+      LIMIT 500
+      `
+    );
+
+    const messageHistory = await db.all(
+      `
+      SELECT messages.id,
+             messages.message_text,
+             messages.created_at,
+             messages.deleted_at,
+             author.username AS author_username,
+             author.role AS author_role,
+             deleter.username AS deleted_by_username
+      FROM messages
+      JOIN users AS author ON messages.user_id = author.id
+      LEFT JOIN users AS deleter ON messages.deleted_by = deleter.id
+      ORDER BY messages.created_at DESC, messages.id DESC
+      LIMIT 500
+      `
+    );
+
+    const musicRequests = await db.all(
+      `
+      SELECT music_requests.id,
+             music_requests.title,
+             music_requests.video_id,
+             music_requests.status,
+             music_requests.created_at,
+             users.username
+      FROM music_requests
+      JOIN users ON music_requests.user_id = users.id
+      ORDER BY music_requests.created_at DESC, music_requests.id DESC
+      LIMIT 300
+      `
+    );
+
+    const counts = {
+      users: users.length,
+      messages: await db.get("SELECT COUNT(*) AS count FROM messages"),
+      activeMessages: await db.get(
+        "SELECT COUNT(*) AS count FROM messages WHERE deleted_at IS NULL"
+      ),
+      deletedMessages: await db.get(
+        "SELECT COUNT(*) AS count FROM messages WHERE deleted_at IS NOT NULL"
+      ),
+      auditEvents: await db.get("SELECT COUNT(*) AS count FROM audit_logs"),
+      musicRequests: await db.get("SELECT COUNT(*) AS count FROM music_requests")
+    };
+
+    res.render("admin", {
+      users,
+      auditLogs,
+      messageHistory,
+      musicRequests,
+      counts: {
+        users: counts.users,
+        messages: counts.messages.count,
+        activeMessages: counts.activeMessages.count,
+        deletedMessages: counts.deletedMessages.count,
+        auditEvents: counts.auditEvents.count,
+        musicRequests: counts.musicRequests.count
+      }
+    });
+  } catch (err) {
+    console.error("Admin console error:", err);
+    res.status(500).send("Something went wrong.");
+  }
+});
+
+app.get(
+  "/admin/report.csv",
+  requireLogin,
+  requirePermanentAdmin,
+  async (req, res) => {
+    try {
+      const records = [];
+
+      const audits = await db.all(
+        `
+        SELECT audit_logs.id,
+               audit_logs.event_type,
+               audit_logs.action,
+               audit_logs.details,
+               audit_logs.created_at,
+               actor.username AS actor_username,
+               target.username AS target_username
+        FROM audit_logs
+        LEFT JOIN users AS actor ON audit_logs.user_id = actor.id
+        LEFT JOIN users AS target ON audit_logs.target_user_id = target.id
+        ORDER BY audit_logs.created_at ASC, audit_logs.id ASC
+        `
+      );
+
+      for (const row of audits) {
+        records.push({
+          timestamp: row.created_at,
+          category: "audit",
+          eventType: row.event_type || "legacy",
+          actor: row.actor_username || "system",
+          target: row.target_username || "",
+          action: row.action,
+          content: row.details || "",
+          status: "",
+          resourceId: row.id
+        });
+      }
+
+      const messages = await db.all(
+        `
+        SELECT messages.id,
+               messages.message_text,
+               messages.created_at,
+               messages.deleted_at,
+               author.username AS author_username,
+               deleter.username AS deleted_by_username
+        FROM messages
+        JOIN users AS author ON messages.user_id = author.id
+        LEFT JOIN users AS deleter ON messages.deleted_by = deleter.id
+        ORDER BY messages.created_at ASC, messages.id ASC
+        `
+      );
+
+      for (const row of messages) {
+        records.push({
+          timestamp: row.created_at,
+          category: "chat",
+          eventType: "chat.message_record",
+          actor: row.author_username,
+          target: row.deleted_by_username || "",
+          action: row.deleted_at ? "Message retained after moderation deletion" : "Message posted",
+          content: row.message_text,
+          status: row.deleted_at ? `deleted ${row.deleted_at}` : "active",
+          resourceId: row.id
+        });
+      }
+
+      const music = await db.all(
+        `
+        SELECT music_requests.id,
+               music_requests.title,
+               music_requests.video_id,
+               music_requests.status,
+               music_requests.created_at,
+               users.username
+        FROM music_requests
+        JOIN users ON music_requests.user_id = users.id
+        ORDER BY music_requests.created_at ASC, music_requests.id ASC
+        `
+      );
+
+      for (const row of music) {
+        records.push({
+          timestamp: row.created_at,
+          category: "music_request",
+          eventType: "music.request_record",
+          actor: row.username,
+          target: "",
+          action: row.title,
+          content: row.video_id,
+          status: row.status,
+          resourceId: row.id
+        });
+      }
+
+      records.sort((a, b) =>
+        String(a.timestamp).localeCompare(String(b.timestamp))
+      );
+
+      const header = [
+        "timestamp",
+        "category",
+        "event_type",
+        "actor",
+        "target",
+        "action",
+        "content_or_details",
+        "status",
+        "resource_id"
+      ];
+
+      const rows = [
+        header.map(csvCell).join(","),
+        ...records.map((record) =>
+          [
+            record.timestamp,
+            record.category,
+            record.eventType,
+            record.actor,
+            record.target,
+            record.action,
+            record.content,
+            record.status,
+            record.resourceId
+          ].map(csvCell).join(",")
+        )
+      ];
+
+      const date = new Date().toISOString().slice(0, 10);
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="secure-lofi-admin-audit-${date}.csv"`
+      );
+
+      res.send("\uFEFF" + rows.join("\n"));
+    } catch (err) {
+      console.error("Admin report export error:", err);
       res.status(500).send("Something went wrong.");
     }
   }
@@ -1510,6 +1861,18 @@ io.on("connection", async (socket) => {
       const result = await db.run(
         "INSERT INTO messages (user_id, message_text) VALUES (?, ?)",
         [user.id, storedMessage]
+      );
+
+      await writeAudit(
+        user.id,
+        "chat.message",
+        `Sent chat message ID ${result.lastID}`,
+        {
+          details: {
+            messageId: result.lastID,
+            filteredForNonAdmin: user.role !== "admin"
+          }
+        }
       );
 
       const savedMessage = await db.get(
@@ -1576,7 +1939,16 @@ io.on("connection", async (socket) => {
         return;
       }
 
+      const firstVote = !nextVotes.has(user.id);
       nextVotes.set(user.id, user.username);
+
+      if (firstVote) {
+        await writeAudit(
+          user.id,
+          "player.vote_next",
+          "Voted to advance to the next track"
+        );
+      }
 
       const voteState = getVoteState();
       io.emit("vote:update", voteState);
