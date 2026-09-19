@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Secure Lo-Fi Study Cafe portfolio demo">
+  <title>Register | Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <section class="auth-card" aria-labelledby="register-title">
+      <div class="cafe-icon" aria-hidden="true">☕</div>
+      <h1 id="register-title">Create Account</h1>
+      <p class="auth-subtitle">Register to join your cozy study room.</p>
+
+      <div id="auth-error" class="alert" role="alert" hidden></div>
+
+      <form id="auth-form" data-auth-mode="register" class="stack-form">
+        <label>
+          Username
+          <input id="username" name="username" autocomplete="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" placeholder="Choose a username" required>
+        </label>
+
+        <label>
+          Password
+          <input id="password" type="password" name="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required>
+        </label>
+
+        <div>
+          <button class="button primary" type="submit">Register</button>
+        </div>
+
+        <p class="auth-switch">Already have an account? <a href="./index.html">Log In</a></p>
+      </form>
+
+      <p class="security-note">This static demo stores only browser-local demo account data. The full Node.js project hashes passwords with bcrypt and performs authentication on the server.</p>
+    </section>
+  </main>
+
+  <script src="./auth.js"></script>
+</body>
+</html>
