@@ -154,7 +154,7 @@
       })
     );
 
-    window.location.href = "./cafe.html";
+    window.location.href = "./cafe.html?v=3.1.1";
   }
 
   form.addEventListener("submit", async (event) => {
