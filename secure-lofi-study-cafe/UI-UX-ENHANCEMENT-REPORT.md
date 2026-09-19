@@ -19,6 +19,10 @@ The redesign followed accessibility guidance rather than relying only on visual 
 
 ## Visual redesign
 
+### Authentication experience
+
+The login and registration screens now use the same animated coffee identity and warmer glass-like café card styling as the main room. The mobile layout keeps the form single-column with large controls and avoids horizontal overflow.
+
 ### Warmer café atmosphere
 
 The old layout used large flat dark-brown surfaces with limited visual depth. The refreshed design uses:
@@ -75,6 +79,7 @@ The current user can move their avatar with:
 * Arrow keys
 * WASD
 * On-screen directional buttons
+* Clicking/tapping a destination on the café floor
 
 Movement is bounded inside the room.
 
