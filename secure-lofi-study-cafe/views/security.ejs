@@ -18,7 +18,7 @@
       <div>
         <p class="eyebrow">Security Engineering v3.1</p>
         <h1>Backend Security Architecture</h1>
-        <p class="session-line">Node.js · Express · SQLite · Socket.IO · EJS</p>
+        <p class="session-line">Node.js · Express · Turso/libSQL · Socket.IO · EJS</p>
       </div>
     </div>
 
@@ -62,8 +62,8 @@
 
       <article class="panel security-control-card">
         <p class="eyebrow">Database</p>
-        <h2>Parameterized SQLite</h2>
-        <p>Application data and security telemetry are stored in SQLite. User-controlled values are passed through placeholders instead of SQL string concatenation.</p>
+        <h2>Parameterized Turso / libSQL</h2>
+        <p>Application data and security telemetry are stored in Turso/libSQL. User-controlled values are passed through placeholders instead of SQL string concatenation.</p>
         <code>SELECT ... WHERE username = ?</code>
       </article>
 
@@ -193,7 +193,7 @@ ORDER BY created_at ASC;</code></pre>
 
                     │
                     ▼
-                 SQLite
+                 Turso/libSQL
         ┌───────────┼────────────┐
         │           │            │
    app records   audit_logs  security_events
