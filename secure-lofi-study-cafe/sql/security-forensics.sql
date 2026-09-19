@@ -1,5 +1,5 @@
 -- Secure Lo-Fi Study Cafe
--- Security Engineering v3.0
+-- Security Engineering v3.1
 -- SQLite forensic and operational queries.
 --
 -- These queries are intended for the application's local SQLite database.
