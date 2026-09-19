@@ -179,9 +179,12 @@ The production image:
 * creates a writable `/data` directory;
 * sets `NODE_ENV=production`;
 * uses `DB_PATH=/data/lofi_cafe.db`;
-* runs as the non-root Node user.
+* starts through a small entrypoint that fixes ownership on the mounted Railway volume;
+* drops privileges with `gosu` before launching Node, so the application process itself does not run as root.
 
 Railway deployment uses root Dockerfile auto-detection. The Railway service settings configure the `/healthz` deployment healthcheck, a single replica, public networking, and the `/data` persistent volume.
+
+Railway's legacy `railway.json` config-as-code path is deprecated for new services, so version 3.1 does not rely on it.
 
 ### Persistent volume requirement
 
