@@ -36,16 +36,13 @@ jobs:
         run: |
           node --check server.js
           node --check database.js
-          node --check sqlite-session-store.js
+          node --check libsql-session-store.js
           node --check public/cafe.js
           node --check public/admin.js
           node --check demo/auth.js
           node --check demo/demo.js
           node --check demo/admin-demo.js
           node --check scripts/security-smoke-test.js
-
-      - name: Check production entrypoint syntax
-        run: sh -n docker-entrypoint.sh
 
       - name: Compile EJS templates
         run: |
@@ -58,7 +55,7 @@ jobs:
           }
           NODE
 
-      - name: Verify SQLite security schema and indexes
+      - name: Verify libSQL security schema and indexes
         run: npm run test:security
 
       - name: Build production container
