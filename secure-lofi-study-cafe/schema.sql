@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',
+    avatar_image TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
