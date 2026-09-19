@@ -1,7 +1,10 @@
 -- Secure Lo-Fi Study Café
--- SQLite schema extracted from the application's database initialization.
+-- Security Engineering v4.0 self-hosted SQLite schema.
 
 PRAGMA foreign_keys = ON;
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA busy_timeout = 5000;
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
