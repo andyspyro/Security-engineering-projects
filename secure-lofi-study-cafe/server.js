@@ -25,6 +25,8 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
 const SESSION_SECRET = process.env.SESSION_SECRET;
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 if (!SESSION_SECRET) {
   throw new Error("SESSION_SECRET is required. Copy .env.example to .env and set a random value.");
@@ -98,6 +100,77 @@ function validateProfileImageDataUrl(value) {
   }
 
   return `data:${mime};base64,${bytes.toString("base64")}`;
+}
+
+async function ensureBootstrapAdmin() {
+  if (process.env.NODE_ENV === "production" && (!ADMIN_USERNAME || !ADMIN_PASSWORD)) {
+    throw new Error(
+      "ADMIN_USERNAME and ADMIN_PASSWORD are required in production."
+    );
+  }
+
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+    console.warn(
+      "No bootstrap admin configured. Set ADMIN_USERNAME and ADMIN_PASSWORD to provision one."
+    );
+    return;
+  }
+
+  if (!/^[a-zA-Z0-9_]{3,30}$/.test(ADMIN_USERNAME)) {
+    throw new Error(
+      "ADMIN_USERNAME must be 3-30 characters using letters, numbers, or underscores."
+    );
+  }
+
+  if (ADMIN_PASSWORD.length < 12) {
+    throw new Error("ADMIN_PASSWORD must be at least 12 characters.");
+  }
+
+  const existing = await db.get(
+    "SELECT id, username, role FROM users WHERE username = ?",
+    [ADMIN_USERNAME]
+  );
+
+  if (existing) {
+    if (existing.role !== "admin") {
+      await db.run(
+        "UPDATE users SET role = 'admin' WHERE id = ?",
+        [existing.id]
+      );
+
+      await writeAudit(
+        existing.id,
+        "admin.bootstrap_role",
+        "Promoted configured bootstrap account to permanent admin"
+      );
+    }
+
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+
+  const result = await db.run(
+    "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')",
+    [ADMIN_USERNAME, passwordHash]
+  );
+
+  await writeAudit(
+    result.lastID,
+    "admin.bootstrap_create",
+    "Provisioned permanent admin from server configuration",
+    { details: { username: ADMIN_USERNAME } }
+  );
+
+  await writeSecurityEvent({
+    eventType: "admin.bootstrap_create",
+    severity: "NOTICE",
+    actorUserId: result.lastID,
+    usernameSnapshot: ADMIN_USERNAME,
+    outcome: "success",
+    route: "startup",
+    metadata: { role: "admin" }
+  });
 }
 
 function defaultAvatarState(userId) {
@@ -1229,8 +1302,7 @@ app.post(
         });
       }
 
-      const userCount = await db.get("SELECT COUNT(*) AS count FROM users");
-      const role = userCount.count === 0 ? "admin" : "user";
+      const role = "user";
 
       const passwordHash = await bcrypt.hash(password, 12);
 
@@ -2767,6 +2839,15 @@ io.on("connection", async (socket) => {
    Start
 ------------------------- */
 
-server.listen(PORT, () => {
-  console.log(`Secure Lo-Fi Study Café running at http://localhost:${PORT}`);
+async function startServer() {
+  await ensureBootstrapAdmin();
+
+  server.listen(PORT, () => {
+    console.log(`Secure Lo-Fi Study Café running at http://localhost:${PORT}`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error("Startup failed:", err.message);
+  process.exit(1);
 });
