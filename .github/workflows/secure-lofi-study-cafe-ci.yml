@@ -1,0 +1,49 @@
+name: Validate Secure Lo-Fi Study Cafe
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "secure-lofi-study-cafe/**"
+      - ".github/workflows/secure-lofi-study-cafe-ci.yml"
+  pull_request:
+    paths:
+      - "secure-lofi-study-cafe/**"
+      - ".github/workflows/secure-lofi-study-cafe-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: secure-lofi-study-cafe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dependencies for validation
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check server.js
+          node --check database.js
+          node --check public/cafe.js
+          node --check demo/demo.js
+
+      - name: Compile EJS templates
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const ejs = require("ejs");
+          for (const file of ["views/register.ejs", "views/login.ejs", "views/cafe.ejs"]) {
+            ejs.compile(fs.readFileSync(file, "utf8"), { filename: file });
+            console.log("Compiled:", file);
+          }
+          NODE
