@@ -249,7 +249,7 @@ Users can now upload a profile picture for their café avatar.
 
 ### Full Node application
 
-The profile picture is persisted with the user account in SQLite and is included in live Socket.IO presence updates so other connected members can see it.
+The profile picture is persisted with the user account in SQLite. Socket.IO presence broadcasts only a small authenticated profile-image URL, while the actual image is fetched separately from the application. This prevents large base64 images from being resent with every movement/presence update.
 
 The upload path is intentionally constrained:
 
@@ -258,6 +258,9 @@ The upload path is intentionally constrained:
 * SVG is rejected;
 * the server validates both the data-URL MIME type and the binary file signature before accepting the image;
 * the normalized image is stored as account profile data;
+* profile images are served through a login-protected application route;
+* presence packets contain only a small profile-image URL/version rather than the full image;
+* the image is shown on both the Café Floor avatar and the Members in Room list;
 * only the fact that a profile image was updated or removed is written to the audit log — the image itself is not copied into audit records.
 
 This avoids introducing an unrestricted filesystem upload endpoint while still providing persistent profile imagery.
@@ -279,7 +282,7 @@ Users can now:
 
 Movement is calculated from elapsed animation-frame time, which produces a consistent walking speed instead of depending on keyboard repeat rate.
 
-The live Node application throttles outgoing Socket.IO movement updates while keeping the local animation smooth. This reduces unnecessary network traffic while other users still receive frequent position updates.
+The local avatar is animated directly with requestAnimationFrame, while remote avatars interpolate between throttled Socket.IO position updates. This gives the current user responsive movement without flooding the network, while other users still see smooth motion.
 
 A subtle walking/bobbing animation is applied while movement is active. It is disabled under `prefers-reduced-motion: reduce`.
 
