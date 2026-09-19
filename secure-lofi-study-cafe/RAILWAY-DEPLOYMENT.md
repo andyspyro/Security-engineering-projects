@@ -14,12 +14,7 @@ This is the deployment that supports realtime communication between an administr
 
 ## Repository configuration already included
 
-The repository root contains:
-
-```text
-Dockerfile
-railway.json
-```
+The repository root contains a production `Dockerfile`, which Railway auto-detects when the GitHub repository is connected as the service source.
 
 The service listens on Railway's injected `PORT` variable and exposes:
 
