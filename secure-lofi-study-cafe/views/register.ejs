@@ -3,39 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Create account | Secure Lo-Fi Study Cafe</title>
-  <link rel="stylesheet" href="/styles.css">
+  <title>Register | Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body class="auth-page">
   <main class="auth-shell">
     <section class="auth-card" aria-labelledby="register-title">
-      <div class="brand-mark" aria-hidden="true">♫</div>
-      <p class="eyebrow">Secure study room</p>
-      <h1 id="register-title">Create your cafe account</h1>
-      <p class="muted">Join the room, chat with other students, and request music for the shared queue.</p>
+      <div class="cafe-icon" aria-hidden="true">☕</div>
+      <h1 id="register-title">Create Account</h1>
+      <p class="auth-subtitle">Register to join your cozy study room.</p>
 
       <% if (errors && errors.length) { %>
         <div class="alert" role="alert">
-          <strong>Check the form:</strong>
-          <ul>
-            <% errors.forEach((error) => { %><li><%= error %></li><% }) %>
-          </ul>
+          <% errors.forEach((error) => { %>
+            <div><%= error %></div>
+          <% }) %>
         </div>
       <% } %>
 
       <form method="post" action="/register" class="stack-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <label>Username
-          <input name="username" autocomplete="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" required>
-        </label>
-        <label>Password
-          <input type="password" name="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <button class="button primary" type="submit">Create account</button>
-      </form>
 
-      <p class="auth-switch">Already registered? <a href="/login">Sign in</a></p>
-      <p class="security-note">Passwords are hashed with bcrypt and state-changing requests use CSRF protection.</p>
+        <label>
+          Username
+          <input name="username" autocomplete="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" placeholder="Choose a username" required>
+        </label>
+
+        <label>
+          Password
+          <input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required>
+        </label>
+
+        <div>
+          <button class="button primary" type="submit">Register</button>
+        </div>
+
+        <p class="auth-switch">Already have an account? <a href="/login">Log In</a></p>
+      </form>
     </section>
   </main>
 </body>
