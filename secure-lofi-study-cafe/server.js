@@ -11,7 +11,7 @@ const crypto = require("crypto");
 const { Server } = require("socket.io");
 const { body, validationResult } = require("express-validator");
 const db = require("./database");
-const SQLiteSessionStore = require("./sqlite-session-store");
+const LibSQLSessionStore = require("./libsql-session-store");
 
 const app = express();
 
@@ -323,7 +323,7 @@ app.use(generalLimiter);
    Sessions
 ------------------------- */
 
-const sessionStore = new SQLiteSessionStore({
+const sessionStore = new LibSQLSessionStore({
   defaultTtlMs: 1000 * 60 * 60
 });
 
