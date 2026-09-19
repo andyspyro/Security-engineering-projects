@@ -772,6 +772,12 @@ function addSocketToPresence(socket, user) {
   }
 
   if (isNewJoin) {
+    writeAudit(
+      user.id,
+      "room.join",
+      "Joined the study room"
+    ).catch((err) => console.error("Join audit error:", err));
+
     io.emit("room:system", {
       text: `${user.username} joined the room.`
     });
@@ -792,6 +798,12 @@ function removeSocketFromPresence(socket, user) {
   if (member.socketIds.size === 0) {
     onlineUsers.delete(user.id);
     nextVotes.delete(user.id);
+
+    writeAudit(
+      user.id,
+      "room.leave",
+      "Left the study room"
+    ).catch((err) => console.error("Leave audit error:", err));
 
     io.emit("room:system", {
       text: `${user.username} left the room.`
@@ -939,6 +951,13 @@ app.post(
       );
 
       if (!user) {
+        await writeAudit(
+          null,
+          "auth.login_failed",
+          "Failed login attempt",
+          { details: { attemptedUsername: username } }
+        );
+
         return res.status(400).render("login", {
           errors: ["Invalid username or password."]
         });
@@ -947,6 +966,13 @@ app.post(
       const passwordMatches = await bcrypt.compare(password, user.password_hash);
 
       if (!passwordMatches) {
+        await writeAudit(
+          user.id,
+          "auth.login_failed",
+          "Failed login attempt",
+          { details: { attemptedUsername: username } }
+        );
+
         return res.status(400).render("login", {
           errors: ["Invalid username or password."]
         });
