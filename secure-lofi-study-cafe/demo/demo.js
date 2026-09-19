@@ -512,6 +512,11 @@
     if (isAdmin) {
       article.appendChild(
         makeButton("Delete", "danger", () => {
+          logAudit(
+            "chat.delete",
+            "Deleted chat message",
+            { author: session.username, message: body.textContent }
+          );
           article.remove();
         })
       );
