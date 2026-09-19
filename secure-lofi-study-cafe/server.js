@@ -33,6 +33,66 @@ const tempModeratorIds = new Set();
 const nextVotes = new Map();
 
 const AVATAR_STYLES = ["latte", "mocha", "matcha", "berry", "sky", "lavender"];
+const PROFILE_IMAGE_MAX_BYTES = 512 * 1024;
+const PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+function validateProfileImageDataUrl(value) {
+  const match = String(value || "").match(
+    /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const mime = match[1];
+  if (!PROFILE_IMAGE_TYPES.has(mime)) {
+    return null;
+  }
+
+  let bytes;
+  try {
+    bytes = Buffer.from(match[2], "base64");
+  } catch {
+    return null;
+  }
+
+  if (!bytes.length || bytes.length > PROFILE_IMAGE_MAX_BYTES) {
+    return null;
+  }
+
+  const isPng =
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a;
+
+  const isJpeg =
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff;
+
+  const isWebp =
+    bytes.length >= 12 &&
+    bytes.toString("ascii", 0, 4) === "RIFF" &&
+    bytes.toString("ascii", 8, 12) === "WEBP";
+
+  if (
+    (mime === "image/png" && !isPng) ||
+    (mime === "image/jpeg" && !isJpeg) ||
+    (mime === "image/webp" && !isWebp)
+  ) {
+    return null;
+  }
+
+  return `data:${mime};base64,${bytes.toString("base64")}`;
+}
 
 function defaultAvatarState(userId) {
   const numericId = Math.max(1, Number(userId) || 1);
@@ -730,7 +790,8 @@ function getMembersList() {
     updatedAt: member.updatedAt,
     avatarStyle: member.avatarStyle,
     avatarX: member.avatarX,
-    avatarY: member.avatarY
+    avatarY: member.avatarY,
+    avatarImage: member.avatarImage || null
   }));
 }
 
@@ -786,6 +847,7 @@ function addSocketToPresence(socket, user) {
       avatarStyle: avatar.avatarStyle,
       avatarX: avatar.avatarX,
       avatarY: avatar.avatarY,
+      avatarImage: user.avatarImage || null,
       updatedAt: Date.now()
     });
   }
@@ -1951,6 +2013,17 @@ io.on("connection", async (socket) => {
 
   const user = userSession.user;
 
+  try {
+    const profile = await db.get(
+      "SELECT avatar_image FROM users WHERE id = ?",
+      [user.id]
+    );
+    user.avatarImage = profile ? profile.avatar_image : null;
+  } catch (err) {
+    console.error("Profile image load error:", err);
+    user.avatarImage = null;
+  }
+
   addSocketToPresence(socket, user);
 
   try {
@@ -2066,6 +2139,69 @@ io.on("connection", async (socket) => {
     member.avatarStyle = requested;
     member.updatedAt = Date.now();
     emitPresence();
+  });
+
+  socket.on("member:profile-image", async (data, acknowledge) => {
+    const reply = typeof acknowledge === "function" ? acknowledge : () => {};
+
+    try {
+      if (!data || data.csrfToken !== userSession.csrfToken) {
+        reply({ ok: false, error: "Invalid security token." });
+        return;
+      }
+
+      const member = onlineUsers.get(user.id);
+      if (!member) {
+        reply({ ok: false, error: "User is not active in the room." });
+        return;
+      }
+
+      if (data.remove === true) {
+        await db.run("UPDATE users SET avatar_image = NULL WHERE id = ?", [user.id]);
+        member.avatarImage = null;
+        member.updatedAt = Date.now();
+
+        await writeAudit(
+          user.id,
+          "profile.image_remove",
+          "Removed profile image"
+        );
+
+        emitPresence();
+        reply({ ok: true, removed: true });
+        return;
+      }
+
+      const validatedImage = validateProfileImageDataUrl(data.imageData);
+
+      if (!validatedImage) {
+        reply({
+          ok: false,
+          error: "Use a PNG, JPEG, or WebP image no larger than 512 KB."
+        });
+        return;
+      }
+
+      await db.run(
+        "UPDATE users SET avatar_image = ? WHERE id = ?",
+        [validatedImage, user.id]
+      );
+
+      member.avatarImage = validatedImage;
+      member.updatedAt = Date.now();
+
+      await writeAudit(
+        user.id,
+        "profile.image_update",
+        "Updated profile image"
+      );
+
+      emitPresence();
+      reply({ ok: true });
+    } catch (err) {
+      console.error("Profile image update error:", err);
+      reply({ ok: false, error: "Profile image update failed." });
+    }
   });
 
   socket.on("controller:heartbeat", (data) => {
