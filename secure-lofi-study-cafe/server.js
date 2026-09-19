@@ -1425,7 +1425,7 @@ app.get("/profile-image/:id", requireLogin, async (req, res) => {
   }
 });
 
-app.get("/security", requireLogin, (req, res) => {
+app.get("/security", (req, res) => {
   res.render("security");
 });
 
