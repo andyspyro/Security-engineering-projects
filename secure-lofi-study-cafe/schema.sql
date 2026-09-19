@@ -15,8 +15,11 @@ CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     message_text TEXT NOT NULL,
+    deleted_at DATETIME,
+    deleted_by INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (deleted_by) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS music_requests (
@@ -50,7 +53,11 @@ CREATE TABLE IF NOT EXISTS music_queue (
 CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
+    event_type TEXT NOT NULL DEFAULT 'legacy',
+    target_user_id INTEGER,
     action TEXT NOT NULL,
+    details TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (target_user_id) REFERENCES users(id)
 );
