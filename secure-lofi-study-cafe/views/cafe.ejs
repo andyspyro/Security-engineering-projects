@@ -136,7 +136,7 @@
           <span class="badge live"><span id="floor-member-count">0</span> here</span>
         </div>
 
-        <div id="avatar-stage" class="avatar-stage" tabindex="0" aria-label="Interactive café floor. Use arrow keys or WASD to move your avatar.">
+        <div id="avatar-stage" class="avatar-stage" tabindex="0" aria-label="Interactive café floor. Hold arrow keys or WASD to walk, or click a destination.">
           <div class="cafe-window" aria-hidden="true"><span class="window-moon"></span></div>
           <div class="floor-lamp floor-lamp-left" aria-hidden="true"></div>
           <div class="floor-lamp floor-lamp-right" aria-hidden="true"></div>
@@ -147,14 +147,23 @@
         </div>
 
         <div class="avatar-toolbar">
-          <div class="avatar-style-picker" aria-label="Choose avatar color">
-            <span class="compact">Your avatar</span>
-            <button class="avatar-swatch avatar-latte" data-avatar-style="latte" type="button" aria-label="Latte avatar"></button>
-            <button class="avatar-swatch avatar-mocha" data-avatar-style="mocha" type="button" aria-label="Mocha avatar"></button>
-            <button class="avatar-swatch avatar-matcha" data-avatar-style="matcha" type="button" aria-label="Matcha avatar"></button>
-            <button class="avatar-swatch avatar-berry" data-avatar-style="berry" type="button" aria-label="Berry avatar"></button>
-            <button class="avatar-swatch avatar-sky" data-avatar-style="sky" type="button" aria-label="Sky avatar"></button>
-            <button class="avatar-swatch avatar-lavender" data-avatar-style="lavender" type="button" aria-label="Lavender avatar"></button>
+          <div class="avatar-personalize">
+            <div class="avatar-style-picker" aria-label="Choose avatar color">
+              <span class="compact">Your avatar</span>
+              <button class="avatar-swatch avatar-latte" data-avatar-style="latte" type="button" aria-label="Latte avatar"></button>
+              <button class="avatar-swatch avatar-mocha" data-avatar-style="mocha" type="button" aria-label="Mocha avatar"></button>
+              <button class="avatar-swatch avatar-matcha" data-avatar-style="matcha" type="button" aria-label="Matcha avatar"></button>
+              <button class="avatar-swatch avatar-berry" data-avatar-style="berry" type="button" aria-label="Berry avatar"></button>
+              <button class="avatar-swatch avatar-sky" data-avatar-style="sky" type="button" aria-label="Sky avatar"></button>
+              <button class="avatar-swatch avatar-lavender" data-avatar-style="lavender" type="button" aria-label="Lavender avatar"></button>
+            </div>
+
+            <div class="profile-photo-controls">
+              <input id="profile-image-input" class="sr-only" type="file" accept="image/png,image/jpeg,image/webp">
+              <label class="button secondary small" for="profile-image-input">Upload profile picture</label>
+              <button id="remove-profile-image" class="button ghost small" type="button">Remove picture</button>
+              <span id="profile-image-status" class="compact" aria-live="polite"></span>
+            </div>
           </div>
 
           <div class="avatar-move-controls" aria-label="Move avatar">
