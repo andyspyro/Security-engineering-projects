@@ -32,6 +32,25 @@ const onlineUsers = new Map();
 const tempModeratorIds = new Set();
 const nextVotes = new Map();
 
+const AVATAR_STYLES = ["latte", "mocha", "matcha", "berry", "sky", "lavender"];
+
+function defaultAvatarState(userId) {
+  const numericId = Math.max(1, Number(userId) || 1);
+  return {
+    avatarStyle: AVATAR_STYLES[(numericId - 1) % AVATAR_STYLES.length],
+    avatarX: 18 + ((numericId * 23) % 64),
+    avatarY: 22 + ((numericId * 17) % 56)
+  };
+}
+
+function clampPercent(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+  return Math.min(92, Math.max(8, number));
+}
+
 let controllerUserId = null;
 
 let controllerState = {
@@ -708,7 +727,10 @@ function getMembersList() {
     followingRoom: member.followingRoom,
     currentSeconds: member.currentSeconds,
     isPlaying: member.isPlaying,
-    updatedAt: member.updatedAt
+    updatedAt: member.updatedAt,
+    avatarStyle: member.avatarStyle,
+    avatarX: member.avatarX,
+    avatarY: member.avatarY
   }));
 }
 
@@ -749,6 +771,8 @@ function addSocketToPresence(socket, user) {
     existing.socketIds.add(socket.id);
     existing.updatedAt = Date.now();
   } else {
+    const avatar = defaultAvatarState(user.id);
+
     onlineUsers.set(user.id, {
       id: user.id,
       username: user.username,
@@ -759,6 +783,9 @@ function addSocketToPresence(socket, user) {
       followingRoom: true,
       currentSeconds: 0,
       isPlaying: false,
+      avatarStyle: avatar.avatarStyle,
+      avatarX: avatar.avatarX,
+      avatarY: avatar.avatarY,
       updatedAt: Date.now()
     });
   }
@@ -2011,6 +2038,34 @@ io.on("connection", async (socket) => {
       currentSeconds: data && data.currentSeconds,
       isPlaying: data && data.isPlaying
     });
+  });
+
+  socket.on("member:move", (data) => {
+    const member = onlineUsers.get(user.id);
+    if (!member) {
+      return;
+    }
+
+    member.avatarX = clampPercent(data && data.x, member.avatarX);
+    member.avatarY = clampPercent(data && data.y, member.avatarY);
+    member.updatedAt = Date.now();
+    emitPresence();
+  });
+
+  socket.on("member:avatar", (data) => {
+    const member = onlineUsers.get(user.id);
+    if (!member) {
+      return;
+    }
+
+    const requested = String((data && data.style) || "");
+    if (!AVATAR_STYLES.includes(requested)) {
+      return;
+    }
+
+    member.avatarStyle = requested;
+    member.updatedAt = Date.now();
+    emitPresence();
   });
 
   socket.on("controller:heartbeat", (data) => {
