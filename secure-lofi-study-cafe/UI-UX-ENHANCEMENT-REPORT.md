@@ -1,5 +1,7 @@
 # Secure Lo-Fi Study Cafe — UI/UX Enhancement Report
 
+**Version:** 3.0
+
 ## Purpose
 
 This update modernizes the Secure Lo-Fi Study Cafe without changing its security-first architecture. The goal was to make the interface feel warmer, easier to scan, more social, and more usable on phones while preserving the existing authentication, moderation, audit, music, and role-based controls.
@@ -216,20 +218,20 @@ The avatar room does not create additional personal-data collection. Administrat
   * Added reduced-motion support.
   * Added stronger keyboard-focus states.
 
-### GitHub Pages portfolio demo
+### GitHub Pages interface showcase
 
 * `demo/cafe.html`
   * Added the same coffee identity and Café Floor UI.
 
 * `demo/demo.js`
   * Added local interactive avatar movement and theme selection.
-  * Demonstrates the feature without pretending that GitHub Pages provides a live multi-user server.
+  * Demonstrates the interaction locally in the browser; cross-user synchronization is provided only by the Node.js/Socket.IO backend.
 
 ## Validation
 
 The existing GitHub Actions workflow checks JavaScript syntax and compiles the EJS templates after changes.
 
-The full live multi-user behavior belongs to the Node.js/Socket.IO application. GitHub Pages remains a static portfolio demonstration, so its avatars are an interactive browser-side preview rather than synchronized users across different visitors.
+The full live multi-user behavior belongs to the Node.js/Socket.IO application. GitHub Pages is static, so avatar state in that build is browser-local rather than synchronized across visitors.
 
 ## Future production improvements
 
