@@ -169,7 +169,6 @@ The repository now includes:
 
 ```text
 Dockerfile
-railway.json
 ```
 
 The production image:
@@ -182,12 +181,7 @@ The production image:
 * uses `DB_PATH=/data/lofi_cafe.db`;
 * runs as the non-root Node user.
 
-Railway configuration includes:
-
-* Dockerfile builder;
-* deployment healthcheck at `/healthz`;
-* restart on failure;
-* watched project paths.
+Railway deployment uses root Dockerfile auto-detection. The Railway service settings configure the `/healthz` deployment healthcheck, a single replica, public networking, and the `/data` persistent volume.
 
 ### Persistent volume requirement
 
