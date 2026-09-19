@@ -153,6 +153,11 @@
     }
 
     if (mode === "register") {
+      if (username.toLowerCase() === SHOWCASE_ADMIN.username) {
+        showError("That username is reserved for the cross-device showcase administrator.");
+        return;
+      }
+
       const exists = accounts.some(
         (account) => account.username.toLowerCase() === username.toLowerCase()
       );
