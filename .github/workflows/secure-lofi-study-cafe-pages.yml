@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "secure-lofi-study-cafe/demo/**"
-      - "secure-lofi-study-cafe/public/styles.css"
+      - "secure-lofi-study-cafe/public/style.css"
       - ".github/workflows/secure-lofi-study-cafe-pages.yml"
   workflow_dispatch:
 
@@ -34,9 +34,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p _site/secure-lofi-study-cafe
-          cp secure-lofi-study-cafe/demo/index.html _site/secure-lofi-study-cafe/index.html
-          cp secure-lofi-study-cafe/demo/demo.js _site/secure-lofi-study-cafe/demo.js
-          cp secure-lofi-study-cafe/public/styles.css _site/secure-lofi-study-cafe/styles.css
+          cp -R secure-lofi-study-cafe/demo/. _site/secure-lofi-study-cafe/
+          cp secure-lofi-study-cafe/public/style.css _site/secure-lofi-study-cafe/style.css
+
           cat > _site/index.html <<'EOF'
           <!doctype html>
           <html lang="en">
