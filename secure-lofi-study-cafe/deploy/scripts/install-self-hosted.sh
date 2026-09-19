@@ -62,8 +62,7 @@ cd "$APP_DIR"
 npm install --omit=dev --no-audit --no-fund
 
 chown -R root:root "$APP_DIR"
-find "$APP_DIR" -type d -exec chmod 755 {} +
-find "$APP_DIR" -type f -exec chmod 644 {} +
+chmod 755 "$APP_DIR"
 chmod 755 "$APP_DIR"/deploy/scripts/*.sh
 
 escape_env_value() {
