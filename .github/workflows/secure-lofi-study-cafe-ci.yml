@@ -7,13 +7,11 @@ on:
     paths:
       - "secure-lofi-study-cafe/**"
       - "Dockerfile"
-      - "railway.json"
       - ".github/workflows/secure-lofi-study-cafe-ci.yml"
   pull_request:
     paths:
       - "secure-lofi-study-cafe/**"
       - "Dockerfile"
-      - "railway.json"
       - ".github/workflows/secure-lofi-study-cafe-ci.yml"
   workflow_dispatch:
 
