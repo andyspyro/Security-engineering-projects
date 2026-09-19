@@ -214,10 +214,23 @@ const BLOCKED_WORDS = [
   "fuck",
   "fucking",
   "fucked",
+  "fucker",
+  "fuckers",
+  "motherfucker",
+  "motherfuckers",
   "shit",
+  "shitty",
+  "bullshit",
   "bitch",
+  "bitches",
   "asshole",
-  "dick"
+  "assholes",
+  "dick",
+  "dicks",
+  "cunt",
+  "cunts",
+  "bastard",
+  "bastards"
 ];
 
 function escapeRegex(value) {
@@ -1489,11 +1502,14 @@ io.on("connection", async (socket) => {
         return;
       }
 
-      const censoredMessage = censorBadWords(rawMessage);
+      // Permanent admins may post uncensored messages. All other accounts,
+      // including temporary moderators/controllers, are filtered server-side.
+      const storedMessage =
+        user.role === "admin" ? rawMessage : censorBadWords(rawMessage);
 
       const result = await db.run(
         "INSERT INTO messages (user_id, message_text) VALUES (?, ?)",
-        [user.id, censoredMessage]
+        [user.id, storedMessage]
       );
 
       const savedMessage = await db.get(
