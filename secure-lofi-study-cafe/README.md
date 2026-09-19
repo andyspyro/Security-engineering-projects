@@ -140,3 +140,8 @@ The console includes:
 Regular-user profanity is still censored in the live room. For moderation purposes, the original submitted chat text is retained in the permanent-admin audit trail. The registration and chat interfaces disclose that activity may be retained for moderation.
 
 The audit design intentionally avoids exposing passwords/password hashes, session cookies, CSRF tokens, precise location, browser history, or unrelated device-fingerprint data to the admin interface.
+
+
+## UI/UX redesign report
+
+The research, accessibility rationale, responsive/mobile decisions, animated coffee identity, and interactive avatar-room implementation are documented in [UI-UX-ENHANCEMENT-REPORT.md](UI-UX-ENHANCEMENT-REPORT.md).
