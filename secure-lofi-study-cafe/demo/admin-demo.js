@@ -13,7 +13,11 @@
     session = null;
   }
 
-  if (!session || session.role !== "admin") {
+  if (
+    !session ||
+    String(session.username || "").toLowerCase() !== "admin" ||
+    session.role !== "admin"
+  ) {
     window.location.replace("./cafe.html");
     return;
   }
