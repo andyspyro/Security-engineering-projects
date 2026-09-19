@@ -85,7 +85,7 @@
 
   usernameEl.textContent = session.username;
   roleEl.textContent = session.role;
-  controllerName.textContent = session.username;
+  controllerName.textContent = isAdmin ? session.username : "admin";
 
   if (adminConsoleLink) {
     if (isAdmin) {
