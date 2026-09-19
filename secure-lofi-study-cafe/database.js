@@ -264,9 +264,15 @@ async function all(sql, params = []) {
   return result.rows.map(normalizeRow);
 }
 
+async function close() {
+  await ready;
+  client.close();
+}
+
 module.exports = {
   ready,
   run,
   get,
-  all
+  all,
+  close
 };
