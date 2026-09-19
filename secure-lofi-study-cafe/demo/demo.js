@@ -46,6 +46,7 @@
   const controllerName = document.getElementById("controller-name");
   const logoutButton = document.getElementById("logout-button");
   const adminConsoleLink = document.getElementById("admin-console-link");
+  const securityEngineeringLink = document.getElementById("security-engineering-link");
   const queueList = document.getElementById("queue-list");
   const historyList = document.getElementById("history-list");
   const pendingList = document.getElementById("pending-list");
@@ -83,6 +84,10 @@
 
   if (adminConsoleLink) {
     adminConsoleLink.hidden = !isAdmin;
+  }
+
+  if (securityEngineeringLink) {
+    securityEngineeringLink.hidden = !isAdmin;
   }
 
   const members = [
