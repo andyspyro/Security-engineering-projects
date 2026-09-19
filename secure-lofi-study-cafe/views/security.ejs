@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security Engineering | Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="admin-page">
+  <header class="topbar">
+    <div class="brand-lockup">
+      <div class="coffee-mark" aria-hidden="true">
+        <span class="steam steam-one"></span>
+        <span class="steam steam-two"></span>
+        <span class="steam steam-three"></span>
+        <span class="coffee-cup">☕</span>
+      </div>
+      <div>
+        <p class="eyebrow">Security Engineering v3.0</p>
+        <h1>Backend Security Architecture</h1>
+        <p class="session-line">Node.js · Express · SQLite · Socket.IO · EJS</p>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <a class="button secondary small" href="/cafe">Back to Café</a>
+      <% if (user && user.role === "admin") { %>
+        <a class="button primary small" href="/admin">Admin Console</a>
+      <% } %>
+    </div>
+  </header>
+
+  <main class="admin-shell security-showcase">
+    <section class="security-hero-grid">
+      <article class="panel security-control-card">
+        <p class="eyebrow">Authentication</p>
+        <h2>Server-side identity</h2>
+        <p>Passwords are hashed with bcrypt using cost factor 12. Successful authentication regenerates the Express session before privileged state is attached.</p>
+        <code>bcrypt · session.regenerate() · HttpOnly cookies</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Authorization</p>
+        <h2>Role enforcement</h2>
+        <p>Permanent-admin and moderator checks execute on protected server routes. UI visibility is not treated as authorization.</p>
+        <code>requireLogin · requireModerator · requirePermanentAdmin</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Request integrity</p>
+        <h2>CSRF and request correlation</h2>
+        <p>State-changing HTTP operations require a session-bound CSRF token. Every request receives a UUID correlation identifier returned in the X-Request-ID response header.</p>
+        <code>32-byte CSRF token · request UUID</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Abuse control</p>
+        <h2>Rate limiting and validation</h2>
+        <p>Authentication endpoints have a tighter request limit than general traffic. User input is length- and format-validated before database or media processing.</p>
+        <code>express-rate-limit · express-validator</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Database</p>
+        <h2>Parameterized SQLite</h2>
+        <p>Application data and security telemetry are stored in SQLite. User-controlled values are passed through placeholders instead of SQL string concatenation.</p>
+        <code>SELECT ... WHERE username = ?</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Output security</p>
+        <h2>XSS-resistant rendering</h2>
+        <p>EJS escapes normal server-rendered values. Live chat and avatar speech bubbles are inserted with textContent rather than trusted HTML.</p>
+        <code>EJS escaping · textContent · CSP</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Uploads</p>
+        <h2>Profile-image validation</h2>
+        <p>Profile images are restricted to PNG, JPEG, and WebP, capped at 512 KB, and verified by binary file signature. SVG is rejected.</p>
+        <code>MIME allowlist · magic-byte validation · size limit</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Export safety</p>
+        <h2>CSV injection defense</h2>
+        <p>Admin audit exports neutralize spreadsheet formula prefixes before user-controlled values are written to CSV.</p>
+        <code>= + - @ → prefixed before export</code>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">SQL Telemetry</p>
+          <h2>Security event model</h2>
+        </div>
+        <span class="badge live">indexed</span>
+      </div>
+
+      <div class="security-schema">
+        <code>event_uuid</code>
+        <code>event_type</code>
+        <code>severity</code>
+        <code>actor_user_id</code>
+        <code>username_snapshot</code>
+        <code>target_user_id</code>
+        <code>outcome</code>
+        <code>http_method</code>
+        <code>route</code>
+        <code>request_id</code>
+        <code>session_ref</code>
+        <code>metadata</code>
+        <code>created_at</code>
+      </div>
+
+      <p class="compact">
+        Session correlation uses a keyed HMAC-derived reference. Raw session IDs, password hashes,
+        CSRF tokens, and profile-image data are excluded from security-event records.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Detection Coverage</p>
+          <h2>Events recorded in SQL</h2>
+        </div>
+      </div>
+
+      <div class="security-event-grid">
+        <div><strong>Authentication</strong><span>registration, successful login, failed login, logout, rate-limit blocks</span></div>
+        <div><strong>Authorization</strong><span>unauthenticated access, moderator denial, permanent-admin denial</span></div>
+        <div><strong>Request integrity</strong><span>CSRF validation failure and correlated request ID</span></div>
+        <div><strong>Realtime channel</strong><span>Socket.IO connect and disconnect with non-secret session correlation</span></div>
+        <div><strong>Upload defense</strong><span>accepted profile updates, rejected type/signature/size, CSRF failure</span></div>
+        <div><strong>Administrative audit</strong><span>moderation, deleted messages, music approvals, privilege changes, report exports</span></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Forensics</p>
+          <h2>SQL investigation examples</h2>
+        </div>
+      </div>
+
+      <pre class="security-code"><code>-- Failed login volume by username in the last 24 hours
+SELECT
+    COALESCE(username_snapshot, 'anonymous') AS attempted_user,
+    COUNT(*) AS failure_count,
+    MIN(created_at) AS first_failure,
+    MAX(created_at) AS last_failure
+FROM security_events
+WHERE event_type = 'auth.login_failed'
+  AND created_at >= datetime('now', '-24 hours')
+GROUP BY COALESCE(username_snapshot, 'anonymous')
+ORDER BY failure_count DESC;</code></pre>
+
+      <pre class="security-code"><code>-- Follow one correlated session without storing its real token
+SELECT created_at, event_type, severity, outcome, route, request_id
+FROM security_events
+WHERE session_ref = ?
+ORDER BY created_at ASC;</code></pre>
+
+      <p class="compact">
+        Additional incident-response queries are stored in <code>sql/security-forensics.sql</code>.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Trust Boundaries</p>
+          <h2>Backend request path</h2>
+        </div>
+      </div>
+
+      <pre class="security-code architecture-code"><code>Browser
+  │
+  ├── HTTPS / Express routes
+  │     ├── rate limits
+  │     ├── session authentication
+  │     ├── CSRF validation
+  │     ├── server-side RBAC
+  │     └── parameterized SQL
+  │
+  └── Socket.IO
+        ├── authenticated Express session
+        ├── validated event payloads
+        └── live presence / chat / player state
+
+                    │
+                    ▼
+                 SQLite
+        ┌───────────┼────────────┐
+        │           │            │
+   app records   audit_logs  security_events
+                              + SQL indexes
+                              + forensic queries</code></pre>
+    </section>
+  </main>
+</body>
+</html>
