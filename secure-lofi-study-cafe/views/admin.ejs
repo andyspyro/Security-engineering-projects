@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Console | Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="admin-page">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Permanent Admin</p>
+      <h1>Administration & Audit Console</h1>
+      <p class="session-line">
+        Signed in as <strong><%= user.username %></strong>.
+        This page is restricted to the permanent admin role.
+      </p>
+    </div>
+
+    <div class="topbar-actions">
+      <a class="button secondary small" href="/cafe">Back to Café</a>
+      <a class="button primary small" href="/admin/report.csv">Download CSV Report</a>
+      <form method="post" action="/logout">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="button secondary small" type="submit">Logout</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="admin-shell">
+    <section class="admin-stat-grid" aria-label="Audit summary">
+      <article class="admin-stat">
+        <span>Users</span>
+        <strong><%= counts.users %></strong>
+      </article>
+      <article class="admin-stat">
+        <span>Audit events</span>
+        <strong><%= counts.auditEvents %></strong>
+      </article>
+      <article class="admin-stat">
+        <span>Chat records</span>
+        <strong><%= counts.messages %></strong>
+      </article>
+      <article class="admin-stat">
+        <span>Deleted messages</span>
+        <strong><%= counts.deletedMessages %></strong>
+      </article>
+      <article class="admin-stat">
+        <span>Music requests</span>
+        <strong><%= counts.musicRequests %></strong>
+      </article>
+    </section>
+
+    <section class="panel admin-policy">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Privacy Boundary</p>
+          <h2>What this admin can inspect</h2>
+        </div>
+      </div>
+      <p>
+        The console records activity generated inside this application: usernames, roles,
+        account timestamps, chat content, moderation history, music requests, queue actions,
+        authentication events, votes, and privileged actions.
+      </p>
+      <p class="compact">
+        It intentionally does not expose passwords or password hashes, session cookies,
+        authentication tokens, browser history, precise location, unrelated device data,
+        or hidden device fingerprints.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Search</p>
+          <h2>Filter the audit console</h2>
+        </div>
+      </div>
+      <label class="admin-search-label" for="admin-search">
+        Search usernames, event names, message text, actions, or music titles
+        <input id="admin-search" type="search" placeholder="Search audit records…">
+      </label>
+    </section>
+
+    <section class="panel admin-section" data-admin-section>
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Accounts</p>
+          <h2>User Directory</h2>
+        </div>
+        <span class="badge admin">permanent-admin view</span>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Registered</th>
+              <th>Messages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach((account) => { %>
+              <tr data-admin-row>
+                <td><strong><%= account.username %></strong></td>
+                <td><%= account.role %></td>
+                <td><%= account.created_at %></td>
+                <td><%= account.message_count %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel admin-section" data-admin-section>
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Audit Trail</p>
+          <h2>Security & Administrative Activity</h2>
+        </div>
+        <span class="badge"><%= auditLogs.length %> shown</span>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Actor</th>
+              <th>Event</th>
+              <th>Target</th>
+              <th>Action</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% auditLogs.forEach((entry) => { %>
+              <tr data-admin-row>
+                <td><%= entry.created_at %></td>
+                <td><%= entry.actor_username || "system" %></td>
+                <td><code><%= entry.event_type || "legacy" %></code></td>
+                <td><%= entry.target_username || "—" %></td>
+                <td><%= entry.action %></td>
+                <td class="admin-details"><%= entry.details || "—" %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel admin-section" data-admin-section>
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Communication</p>
+          <h2>Chat Message History</h2>
+        </div>
+        <span class="badge"><%= messageHistory.length %> shown</span>
+      </div>
+
+      <p class="compact">
+        Moderated messages are soft-deleted from the live room but retained here so the
+        permanent admin can reconstruct what happened and who performed the moderation.
+      </p>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Author</th>
+              <th>Role</th>
+              <th>Message</th>
+              <th>Status</th>
+              <th>Deleted by</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% messageHistory.forEach((message) => { %>
+              <tr data-admin-row>
+                <td><%= message.created_at %></td>
+                <td><strong><%= message.author_username %></strong></td>
+                <td><%= message.author_role %></td>
+                <td class="admin-message"><%= message.message_text %></td>
+                <td>
+                  <% if (message.deleted_at) { %>
+                    <span class="badge admin">deleted</span>
+                    <div class="admin-small"><%= message.deleted_at %></div>
+                  <% } else { %>
+                    <span class="badge live">active</span>
+                  <% } %>
+                </td>
+                <td><%= message.deleted_by_username || "—" %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel admin-section" data-admin-section>
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Media Workflow</p>
+          <h2>Music Request History</h2>
+        </div>
+        <span class="badge"><%= musicRequests.length %> shown</span>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>User</th>
+              <th>Title</th>
+              <th>YouTube ID</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% musicRequests.forEach((request) => { %>
+              <tr data-admin-row>
+                <td><%= request.created_at %></td>
+                <td><strong><%= request.username %></strong></td>
+                <td><%= request.title %></td>
+                <td><code><%= request.video_id %></code></td>
+                <td><%= request.status %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>
