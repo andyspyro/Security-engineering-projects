@@ -14,17 +14,21 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY secure-lofi-study-cafe/ ./
 
-RUN mkdir -p /data \
-    && chown -R node:node /app /data
+RUN chmod +x /app/docker-entrypoint.sh \
+    && mkdir -p /data \
+    && chown node:node /data
 
 ENV NODE_ENV=production
 ENV DB_PATH=/data/lofi_cafe.db
 
-USER node
-
 EXPOSE 3000
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "server.js"]
