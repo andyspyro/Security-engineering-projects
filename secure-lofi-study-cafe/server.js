@@ -11,18 +11,22 @@ const crypto = require("crypto");
 const { Server } = require("socket.io");
 const { body, validationResult } = require("express-validator");
 const db = require("./database");
-const LibSQLSessionStore = require("./libsql-session-store");
+const SQLiteSessionStore = require("./sqlite-session-store");
 
 const app = express();
 
-if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
+const TRUST_PROXY = process.env.TRUST_PROXY === "true";
+const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
+
+if (TRUST_PROXY) {
+  app.set("trust proxy", "loopback");
 }
 
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || "127.0.0.1";
 
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
@@ -323,7 +327,7 @@ app.use(generalLimiter);
    Sessions
 ------------------------- */
 
-const sessionStore = new LibSQLSessionStore({
+const sessionStore = new SQLiteSessionStore({
   defaultTtlMs: 1000 * 60 * 60
 });
 
@@ -344,7 +348,7 @@ const sessionMiddleware = session({
   cookie: {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: COOKIE_SECURE,
     maxAge: 1000 * 60 * 60
   }
 });
@@ -2871,11 +2875,83 @@ io.on("connection", async (socket) => {
    Start
 ------------------------- */
 
+let shuttingDown = false;
+
+async function shutdown(signal) {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+  console.log(`Received ${signal}; shutting down gracefully.`);
+
+  clearInterval(sessionCleanupTimer);
+
+  try {
+    await db.checkpoint("TRUNCATE");
+  } catch (err) {
+    console.error("SQLite checkpoint during shutdown failed:", err);
+  }
+
+  try {
+    await new Promise((resolve) => {
+      io.close(() => resolve());
+    });
+  } catch (err) {
+    console.error("Socket.IO shutdown error:", err);
+  }
+
+  try {
+    if (server.listening) {
+      await new Promise((resolve, reject) => {
+        server.close((err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
+  } catch (err) {
+    console.error("HTTP server shutdown error:", err);
+  }
+
+  try {
+    await db.close();
+  } catch (err) {
+    console.error("SQLite close error:", err);
+  }
+
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => {
+  shutdown("SIGTERM").catch((err) => {
+    console.error("Shutdown error:", err);
+    process.exit(1);
+  });
+});
+
+process.on("SIGINT", () => {
+  shutdown("SIGINT").catch((err) => {
+    console.error("Shutdown error:", err);
+    process.exit(1);
+  });
+});
+
 async function startServer() {
+  await db.ready;
   await ensureBootstrapAdmin();
 
-  server.listen(PORT, () => {
-    console.log(`Secure Lo-Fi Study Café running at http://localhost:${PORT}`);
+  server.listen(PORT, HOST, () => {
+    console.log(
+      `Secure Lo-Fi Study Café listening on http://${HOST}:${PORT}`
+    );
+    console.log(`SQLite database: ${db.path}`);
+    console.log(
+      `Proxy trust: ${TRUST_PROXY ? "loopback proxy only" : "disabled"}; secure cookies: ${COOKIE_SECURE}`
+    );
   });
 }
 
