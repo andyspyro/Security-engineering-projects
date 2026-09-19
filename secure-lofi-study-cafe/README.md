@@ -18,7 +18,7 @@ password: admin12345
 
 The public GitHub Pages site is static. The built-in administrator above is only a UI showcase credential.
 
-Accounts created through the Pages registration form remain browser-local because GitHub Pages does not run Node.js, Socket.IO, or SQLite.
+Accounts created through the Pages registration form remain browser-local because GitHub Pages does not run Node.js, Socket.IO, or the shared Turso database.
 
 The production architecture is the full backend in this directory. Koyeb runs the Node.js/Socket.IO service and Turso provides the shared SQL database. Every device therefore connects to the same users, sessions, room, RBAC rules, audit trail, and security-event data.
 
@@ -103,7 +103,7 @@ Browser
 
                     |
                     v
-                 SQLite
+              Turso / libSQL
         +-----------+-------------+
         |           |             |
     app tables   audit_logs   security_events
@@ -246,11 +246,11 @@ GitHub Actions performs:
 
 * Node.js syntax checks;
 * EJS template compilation;
-* SQLite in-memory schema creation;
+* local libSQL schema initialization;
 * required-table verification;
 * required-index verification;
 * security-event insert/query verification;
-* SQLite query-plan generation;
+* libSQL query-plan generation;
 * persistent-session table verification;
 * production Docker image build.
 
@@ -274,12 +274,15 @@ Generate a session secret:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Set the generated value as `SESSION_SECRET`. Also set:
+Set the generated value as `SESSION_SECRET`. For local development, set:
 
 ```text
+TURSO_DATABASE_URL=file:lofi_cafe.db
 ADMIN_USERNAME=<your permanent admin username>
 ADMIN_PASSWORD=<a private password of at least 12 characters>
 ```
+
+Leave `TURSO_AUTH_TOKEN` empty when using the local file database.
 
 Then start:
 
