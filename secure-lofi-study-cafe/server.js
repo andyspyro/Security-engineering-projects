@@ -1165,6 +1165,19 @@ app.post(
         { details: { username, role } }
       );
 
+      await writeSecurityEvent({
+        eventType: "account.register",
+        severity: role === "admin" ? "NOTICE" : "INFO",
+        actorUserId: createdUser.lastID,
+        usernameSnapshot: username,
+        outcome: "success",
+        httpMethod: req.method,
+        route: req.route.path,
+        requestId: req.requestId,
+        sessionRef: req.sessionRef,
+        metadata: { role }
+      });
+
       res.redirect("/login");
     } catch (err) {
       console.error("Registration error:", err);
@@ -1209,6 +1222,14 @@ app.post(
           { details: { attemptedUsername: username } }
         );
 
+        await recordRequestSecurityEvent(
+          req,
+          "auth.login_failed",
+          "WARNING",
+          "failed",
+          { attemptedUsername: username, reason: "unknown_username" }
+        );
+
         return res.status(400).render("login", {
           errors: ["Invalid username or password."]
         });
@@ -1224,25 +1245,66 @@ app.post(
           { details: { attemptedUsername: username } }
         );
 
+        await writeSecurityEvent({
+          eventType: "auth.login_failed",
+          severity: "WARNING",
+          actorUserId: user.id,
+          usernameSnapshot: user.username,
+          outcome: "failed",
+          httpMethod: req.method,
+          route: req.route.path,
+          requestId: req.requestId,
+          sessionRef: req.sessionRef,
+          metadata: { reason: "invalid_password" }
+        });
+
         return res.status(400).render("login", {
           errors: ["Invalid username or password."]
         });
       }
 
-      req.session.user = {
-        id: user.id,
-        username: user.username,
-        role: user.role
-      };
+      req.session.regenerate(async (regenerateError) => {
+        if (regenerateError) {
+          console.error("Session regeneration error:", regenerateError);
+          return res.status(500).render("login", {
+            errors: ["Something went wrong. Please try again."]
+          });
+        }
 
-      await writeAudit(
-        user.id,
-        "auth.login",
-        "Successful login",
-        { details: { role: user.role } }
-      );
+        req.session.user = {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        };
+        req.session.csrfToken = crypto.randomBytes(32).toString("hex");
 
-      res.redirect("/cafe");
+        try {
+          await writeAudit(
+            user.id,
+            "auth.login",
+            "Successful login",
+            { details: { role: user.role } }
+          );
+
+          await writeSecurityEvent({
+            eventType: "auth.login_success",
+            severity: "INFO",
+            actorUserId: user.id,
+            usernameSnapshot: user.username,
+            outcome: "success",
+            httpMethod: req.method,
+            route: req.route.path,
+            requestId: req.requestId,
+            sessionRef: makeSessionRef(req.sessionID),
+            metadata: { role: user.role, sessionRegenerated: true }
+          });
+
+          res.redirect("/cafe");
+        } catch (loggingError) {
+          console.error("Login security log error:", loggingError);
+          res.redirect("/cafe");
+        }
+      });
     } catch (err) {
       console.error("Login error:", err);
 
@@ -1259,6 +1321,12 @@ app.post("/logout", verifyCsrf, async (req, res) => {
   if (user) {
     try {
       await writeAudit(user.id, "auth.logout", "User logged out");
+      await recordRequestSecurityEvent(
+        req,
+        "auth.logout",
+        "INFO",
+        "success"
+      );
     } catch (err) {
       console.error("Logout audit error:", err);
     }
