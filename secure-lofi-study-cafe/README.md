@@ -1,359 +1,411 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 3.2.0  
-> **Type:** Full-stack secure realtime web application  
-> **Stack:** Node.js, Express, Turso/libSQL, EJS, Socket.IO  
-> **Security focus:** authentication, sessions, RBAC, CSRF, parameterized SQL, structured security telemetry, audit logging, secure uploads, moderation, and incident reconstruction
+> **Release:** 4.0.0  
+> **Type:** self-hosted secure realtime web application  
+> **Runtime:** Node.js 24 LTS, Express, EJS, Socket.IO  
+> **Persistence:** self-hosted SQLite in WAL mode  
+> **Service manager:** systemd  
+> **Security focus:** authentication, RBAC, CSRF, session security, host hardening, SQL telemetry, audit logging, backups, incident reconstruction
 
-## Live showcase
+## What changed in v4.0
 
-**Application UI:** https://andyspyro.github.io/Security-engineering-projects/secure-lofi-study-cafe/
+Version 4.0 removes the requirement for a hosted backend/database provider.
 
-**Cross-device showcase administrator**
+The full application is designed to run on a Linux machine you control:
 
 ```text
-username: admin
-password: admin12345
+Phone / computer
+      |
+      v
+your server
+  |
+  +-- optional Caddy HTTPS or Cloudflare Tunnel
+  |
+  +-- Node.js / Express / Socket.IO
+  |
+  +-- SQLite
+      +-- users
+      +-- sessions
+      +-- messages
+      +-- audit_logs
+      +-- security_events
 ```
 
-The public GitHub Pages site is static. The built-in administrator above is only a UI showcase credential.
+This is the deployment where an administrator on one device and a normal user such as `bunny` on another device use the same account database, room presence, chat, moderation state, and security logs.
 
-Accounts created through the Pages registration form remain browser-local because GitHub Pages does not run Node.js, Socket.IO, or the shared Turso database.
+The GitHub Pages build remains a static interface showcase only. It is not the authoritative multi-user backend.
 
-The production architecture is the full backend in this directory. Koyeb runs the Node.js/Socket.IO service and Turso provides the shared SQL database. Every device therefore connects to the same users, sessions, room, RBAC rules, audit trail, and security-event data.
+## Quick start
 
-## Version 3.2 free shared backend and security engineering
+Recommended host:
 
-Version 3.2 keeps the structured SQL security telemetry pipeline while moving shared persistence to Turso/libSQL so the real multi-user backend can run without a paid persistent web-server volume.
+* Ubuntu Server or Debian;
+* Node.js 24 LTS;
+* a machine that can remain powered on;
+* local SSD/storage for SQLite.
 
-### Structured SQL security events
+Clone:
 
-`security_events` records:
+```bash
+git clone https://github.com/andyspyro/Security-engineering-projects.git
+cd Security-engineering-projects/secure-lofi-study-cafe
+```
 
-* event UUID;
-* event type;
-* severity;
-* actor and username snapshot;
-* optional target user;
-* outcome;
-* HTTP method;
-* route;
-* request UUID;
-* keyed session correlation reference;
-* bounded metadata;
-* timestamp.
+Review and run the installer:
 
-Security telemetry covers:
+```bash
+less deploy/scripts/install-self-hosted.sh
+sudo bash deploy/scripts/install-self-hosted.sh
+```
 
-* registration;
-* login success and failure;
-* logout;
-* authentication rate-limit blocks;
-* CSRF failures;
-* unauthenticated protected-route access;
-* moderator/admin authorization denial;
-* HTTP request status and duration;
-* Socket.IO connect/disconnect;
-* profile-image acceptance and rejection.
+The installer can configure either:
 
-The table is indexed for time, type, actor, severity, and outcome.
+1. LAN-only access for a phone/computer on the same network; or
+2. public HTTPS behind Caddy or an outbound Cloudflare Tunnel.
 
-## Security controls
+Full instructions:
+
+[SELF-HOSTING.md](SELF-HOSTING.md)
+
+## Host security model
+
+The application service runs as:
+
+```text
+securelofi:securelofi
+```
+
+with no interactive shell.
+
+The systemd unit applies controls including:
+
+```ini
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/secure-lofi-study-cafe
+```
+
+Application source is root-owned and read-only to the service.
+
+The application can write only to its database directory.
+
+## Network architecture
+
+### LAN
+
+For controlled local testing:
+
+```text
+HOST=0.0.0.0
+TRUST_PROXY=false
+COOKIE_SECURE=false
+```
+
+Restrict TCP 3000 with UFW to the actual private subnet.
+
+### Public
+
+Recommended:
+
+```text
+HOST=127.0.0.1
+TRUST_PROXY=true
+COOKIE_SECURE=true
+```
+
+Then use either:
+
+* Caddy on TCP 80/443 for automatic HTTPS; or
+* Cloudflare Tunnel for outbound-only public ingress.
+
+Do not port-forward Node port 3000 directly to the public Internet.
+
+## SQLite security and durability
+
+Version 4.0 enables:
+
+```sql
+PRAGMA foreign_keys = ON;
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA busy_timeout = 5000;
+```
+
+Default production database:
+
+```text
+/var/lib/secure-lofi-study-cafe/lofi_cafe.db
+```
+
+Persistent tables:
+
+* users;
+* messages;
+* music_requests;
+* music_queue;
+* sessions;
+* audit_logs;
+* security_events.
+
+The database is outside the web root and restricted to the service account.
+
+## Authentication and RBAC
+
+Security controls include:
 
 | Control | Implementation |
 |---|---|
 | Password storage | bcrypt cost factor 12 |
-| Session fixation defense | session regeneration after successful login |
-| Session cookies | HttpOnly, SameSite=Lax, Secure in production, one-hour expiration |
-| Request correlation | random UUID returned as `X-Request-ID` |
-| Session correlation | HMAC-derived reference; raw session ID is not logged |
-| Authorization | server-side `requireLogin`, `requireModerator`, and `requirePermanentAdmin` |
-| CSRF | random session-bound token on state-changing HTTP actions |
-| Rate limiting | general limiter plus stricter authentication limiter |
-| SQL injection reduction | parameter placeholders for user-controlled database values |
-| XSS reduction | EJS escaping, `textContent`, Content Security Policy |
-| Security headers | Helmet with CSP |
-| Upload security | PNG/JPEG/WebP allowlist, 512 KB cap, binary signature validation |
-| Moderation evidence | soft-deleted messages retain author/deleter/timestamps |
-| Auditability | application `audit_logs` plus structured `security_events` |
-| CSV injection defense | spreadsheet formula prefixes neutralized before export |
-| Realtime security | Socket.IO tied to Express authenticated sessions |
+| Public registration | always creates `user` |
+| Permanent admin | server-configured `ADMIN_USERNAME` / `ADMIN_PASSWORD` |
+| Session fixation defense | session regeneration after login |
+| Session persistence | SQLite `sessions` table |
+| Session cookie | HttpOnly, SameSite=Lax, optional Secure |
+| Authorization | server-side `requireLogin`, `requireModerator`, `requirePermanentAdmin` |
+| CSRF | session-bound random token |
+| Rate limiting | general + tighter auth limiter |
+| Request correlation | UUID returned in `X-Request-ID` |
+| Session correlation | HMAC-derived reference, not raw session ID |
 
-## Backend architecture
+Normal users cannot gain administrator access by changing browser state.
+
+## Application security controls
+
+* parameterized SQL;
+* EJS output escaping;
+* DOM `textContent` for realtime user content;
+* Helmet security headers and CSP;
+* profile-image MIME and magic-byte verification;
+* PNG/JPEG/WebP allowlist;
+* 512 KB image cap;
+* CSV formula-injection neutralization;
+* profanity filtering for normal users;
+* soft-delete moderation evidence;
+* authenticated Socket.IO sessions.
+
+## Security telemetry
+
+`security_events` records structured security activity:
+
+* registration;
+* successful/failed login;
+* logout;
+* auth rate-limit blocks;
+* CSRF failures;
+* authentication-required events;
+* moderator/admin authorization denial;
+* HTTP status/duration;
+* Socket.IO connect/disconnect;
+* profile-image acceptance/rejection.
+
+Fields include:
 
 ```text
-Browser
-  |
-  +-- Express HTTP
-  |     +-- rate limiting
-  |     +-- session authentication
-  |     +-- request UUID
-  |     +-- CSRF validation
-  |     +-- RBAC
-  |     +-- validation
-  |     +-- parameterized SQL
-  |
-  +-- Socket.IO
-        +-- authenticated session
-        +-- chat
-        +-- presence
-        +-- avatar movement
-        +-- player synchronization
-        +-- voting
-
-                    |
-                    v
-              Turso / libSQL
-        +-----------+-------------+
-        |           |             |
-    app tables   audit_logs   security_events
-                              + indexes
-                              + forensic queries
+event UUID
+event type
+severity
+actor
+target
+outcome
+HTTP method
+route
+request ID
+HMAC-derived session reference
+metadata
+timestamp
 ```
 
-## Administrator console
+Sensitive credentials and raw session tokens are intentionally excluded.
 
-Permanent administrators have a separate `/admin` console while retaining all café functionality.
+## Application audit trail
 
-The console includes:
+`audit_logs` records accountability events such as:
 
-* user/account directory;
-* SQL security event stream;
-* severity and outcome;
-* actor/target attribution;
-* route and HTTP method;
-* request UUID;
-* non-secret session correlation reference;
-* structured metadata;
-* application audit trail;
-* chat-message history;
-* soft-deleted moderation evidence;
-* music request history;
-* CSV report export.
+* chat submission;
+* message deletion;
+* music approval/rejection;
+* queue manipulation;
+* temporary privilege changes;
+* administrator report downloads.
 
-The admin console does **not** expose plaintext passwords, password hashes, CSRF tokens, raw session cookies, browser history, precise location, or profile-image binary data in logs.
+This is separate from security telemetry so operational events and security-detection events remain independently useful.
+
+## Backups and recovery
+
+The installer enables a daily systemd timer.
+
+Backup script:
+
+```text
+deploy/scripts/backup-sqlite.sh
+```
+
+It:
+
+1. uses SQLite's online backup command;
+2. runs `PRAGMA quick_check`;
+3. compresses the backup;
+4. creates a SHA-256 checksum;
+5. applies restrictive permissions;
+6. removes backups older than the retention policy.
+
+Restore script:
+
+```text
+deploy/scripts/restore-sqlite.sh
+```
+
+It validates the checksum and SQLite integrity before replacing the live database.
+
+## Health and host audit
+
+Health:
+
+```bash
+/opt/secure-lofi-study-cafe/deploy/scripts/healthcheck.sh
+```
+
+Host-security review:
+
+```bash
+sudo /opt/secure-lofi-study-cafe/deploy/scripts/security-audit.sh
+```
+
+The audit checks:
+
+* systemd status/hardening;
+* listening ports;
+* secret-file permissions;
+* database permissions;
+* SQLite quick_check;
+* WAL mode;
+* UFW status;
+* application health;
+* systemd security analysis.
 
 ## SQL forensics
 
-The repository includes [sql/security-forensics.sql](sql/security-forensics.sql).
+The repository includes:
 
-Queries cover:
+[sql/security-forensics.sql](sql/security-forensics.sql)
+
+It contains investigation queries for:
 
 * high-severity events;
-* blocked/failed activity;
-* failed-login frequency;
+* failed logins;
 * authorization denials;
 * CSRF failures;
 * session correlation;
 * daily event summaries;
 * privileged actions;
 * deleted-message evidence;
-* account activity;
+* user activity;
 * media moderation;
 * unified incident timelines;
-* index verification;
-* `EXPLAIN QUERY PLAN` inspection.
-
-## Security architecture page
-
-The application includes a dedicated Security Engineering page.
-
-In the full backend:
-
-```text
-/security
-```
-
-In the GitHub Pages build, the equivalent interface is guarded by the reserved showcase administrator session. In the full backend, `/security` is protected by `requirePermanentAdmin`.
-
-It presents the backend controls, SQL event model, forensic examples, and trust boundaries directly from the application interface.
+* index inspection;
+* query-plan analysis.
 
 ## Realtime café features
 
-* account registration/login;
+* shared account registration/login;
 * live chat;
-* profanity filtering for normal users;
-* synchronized YouTube playback;
-* shared queue;
-* moderator approval;
-* vote-next;
-* temporary moderator/controller authority;
-* online presence;
+* shared member presence;
+* synchronized avatars;
 * profile pictures;
-* avatar customization;
-* smooth WASD/arrow/touch movement;
+* WASD/arrow/touch avatar movement;
 * click/tap-to-walk;
 * avatar speech bubbles;
-* responsive mobile interface.
+* shared music queue;
+* moderator approval;
+* vote-next;
+* synchronized player state;
+* mobile-responsive interface.
 
-Avatar positions are transient room state and are not persisted to the audit database.
+Avatar X/Y movement is transient and intentionally not persisted to the audit database.
 
-## Secure profile images
+## Acceptance test
 
-The Node backend persists profile images with the user account.
+### Admin computer
 
-Accepted formats:
-
-* PNG;
-* JPEG;
-* WebP.
-
-Validation includes:
-
-* 512 KB decoded-size limit;
-* MIME allowlist;
-* binary file-signature validation;
-* authenticated upload event;
-* authenticated image-read route.
-
-SVG is rejected.
-
-Socket.IO presence packets carry a small profile-image URL/version instead of retransmitting base64 image data with every movement update.
-
-## Audit logging vs security telemetry
-
-Two SQL data sources serve different purposes.
-
-### `audit_logs`
-
-Application accountability:
-
-* message deletion;
-* chat submission;
-* moderation;
-* music approvals/rejections;
-* queue changes;
-* temporary privilege changes;
-* report downloads.
-
-### `security_events`
-
-Security detection and correlation:
-
-* authentication;
-* authorization;
-* CSRF;
-* rate limiting;
-* HTTP outcomes;
-* request IDs;
-* session references;
-* Socket.IO lifecycle;
-* upload validation.
-
-## CI validation
-
-GitHub Actions performs:
-
-* Node.js syntax checks;
-* EJS template compilation;
-* local libSQL schema initialization;
-* required-table verification;
-* required-index verification;
-* security-event insert/query verification;
-* libSQL query-plan generation;
-* persistent-session table verification;
-* production Docker image build.
-
-Run the database security test locally:
-
-```bash
-npm run test:security
-```
-
-## Run the full backend
-
-```bash
-cd secure-lofi-study-cafe
-npm install
-cp .env.example .env
-```
-
-Generate a session secret:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-Set the generated value as `SESSION_SECRET`. For local development, set:
+Expected:
 
 ```text
-TURSO_DATABASE_URL=file:lofi_cafe.db
-ADMIN_USERNAME=<your permanent admin username>
-ADMIN_PASSWORD=<a private password of at least 12 characters>
+Role: admin
+Admin Console: visible
+Security Engineering: visible
 ```
 
-Leave `TURSO_AUTH_TOKEN` empty when using the local file database.
+### Bunny phone
 
-Then start:
-
-```bash
-npm start
-```
-
-Open:
+Expected:
 
 ```text
-http://localhost:3000
+Role: user
+Admin Console: absent
+Security Engineering: absent
 ```
 
-Public registration always creates a normal `user` account. Permanent administrator provisioning is explicit and server-controlled.
-
-## Free production deployment
-
-Use:
-
-```text
-Koyeb Free Web Service
-        |
-        | Node.js / Express / Socket.IO
-        v
-Turso / libSQL
-```
-
-Required Koyeb variables:
-
-```text
-NODE_ENV=production
-SESSION_SECRET=<strong random secret>
-ADMIN_USERNAME=<private permanent-admin username>
-ADMIN_PASSWORD=<private password, 12+ characters>
-TURSO_DATABASE_URL=<Turso database URL>
-TURSO_AUTH_TOKEN=<Turso database token>
-```
-
-Koyeb supplies `PORT` automatically.
-
-No Koyeb persistent volume is required because users, sessions, messages, audit records, and security telemetry live in Turso.
-
-See [KOYEB-TURSO-DEPLOYMENT.md](KOYEB-TURSO-DEPLOYMENT.md) for the complete deployment and cross-device verification procedure.
+With both clients connected to the same self-hosted server, each should see the other in Members in Room and on the Café Floor, and chat should arrive in realtime.
 
 ## Repository map
 
 | File | Purpose |
 |---|---|
-| [server.js](server.js) | HTTP routes, authentication, sessions, CSRF, RBAC, Socket.IO, security telemetry |
-| [database.js](database.js) | Turso/libSQL client, schema initialization, migrations, indexes, query helpers |
-| [schema.sql](schema.sql) | documented relational/security schema |
-| [sql/security-forensics.sql](sql/security-forensics.sql) | investigation and incident-response SQL |
-| [views/admin.ejs](views/admin.ejs) | permanent-admin audit/security console |
-| [views/security.ejs](views/security.ejs) | backend security architecture interface |
-| [public/cafe.js](public/cafe.js) | realtime client behavior |
-| [public/style.css](public/style.css) | responsive café/security interface |
-| [libsql-session-store.js](libsql-session-store.js) | persistent SQL-backed Express session store |
-| [scripts/security-smoke-test.js](scripts/security-smoke-test.js) | disposable libSQL security/database validation |
-| [SECURITY-ENGINEERING-REPORT-v3.2.md](SECURITY-ENGINEERING-REPORT-v3.2.md) | latest free shared-backend/security engineering report |
-| [KOYEB-TURSO-DEPLOYMENT.md](KOYEB-TURSO-DEPLOYMENT.md) | free production deployment runbook |
-| [SECURITY-ENGINEERING-REPORT-v3.1.md](SECURITY-ENGINEERING-REPORT-v3.1.md) | version 3.1 shared-backend report |
-| [SECURITY-ENGINEERING-REPORT-v3.0.md](SECURITY-ENGINEERING-REPORT-v3.0.md) | version 3.0 telemetry/security report |
+| [server.js](server.js) | Express/Socket.IO server, authentication, RBAC, telemetry |
+| [database.js](database.js) | hardened SQLite wrapper, WAL, migrations, query helpers |
+| [sqlite-session-store.js](sqlite-session-store.js) | persistent SQLite-backed Express sessions |
+| [schema.sql](schema.sql) | documented SQLite schema and runtime pragmas |
+| [sql/security-forensics.sql](sql/security-forensics.sql) | incident-response SQL |
+| [deploy/README.md](deploy/README.md) | deployment asset map |
+| [deploy/scripts/install-self-hosted.sh](deploy/scripts/install-self-hosted.sh) | interactive hardened installer |
+| [deploy/systemd/secure-lofi-study-cafe.service](deploy/systemd/secure-lofi-study-cafe.service) | systemd service sandbox |
+| [deploy/scripts/backup-sqlite.sh](deploy/scripts/backup-sqlite.sh) | online verified backups |
+| [deploy/scripts/restore-sqlite.sh](deploy/scripts/restore-sqlite.sh) | verified restore workflow |
+| [deploy/scripts/security-audit.sh](deploy/scripts/security-audit.sh) | host/application security verification |
+| [SELF-HOSTING.md](SELF-HOSTING.md) | full operations runbook |
+| [SECURITY-ENGINEERING-REPORT-v4.0.md](SECURITY-ENGINEERING-REPORT-v4.0.md) | v4 architecture/security report |
 | [CHANGELOG.md](CHANGELOG.md) | release history |
-| [UI-UX-ENHANCEMENT-REPORT.md](UI-UX-ENHANCEMENT-REPORT.md) | interface, mobile, avatar, and accessibility design |
 
-## Reference guidance
+## CI validation
 
-Security decisions were cross-checked against:
+GitHub Actions uses Node.js 24 LTS and checks:
 
-* OWASP Logging Cheat Sheet
-* OWASP Session Management Cheat Sheet
-* OWASP File Upload Cheat Sheet
+* JavaScript syntax;
+* EJS compilation;
+* Bash deployment-script syntax;
+* SQLite schema/tables/indexes;
+* WAL mode;
+* foreign-key enforcement;
+* session persistence;
+* security-event queries;
+* SQLite quick_check;
+* query plans;
+* production Docker build.
 
-Full implementation mapping is documented in [SECURITY-ENGINEERING-REPORT-v3.2.md](SECURITY-ENGINEERING-REPORT-v3.2.md).
+Run locally:
+
+```bash
+npm install
+npm run test:security
+```
+
+## Documentation
+
+Start here:
+
+* [SELF-HOSTING.md](SELF-HOSTING.md)
+* [SECURITY-ENGINEERING-REPORT-v4.0.md](SECURITY-ENGINEERING-REPORT-v4.0.md)
+* [UI-UX-ENHANCEMENT-REPORT.md](UI-UX-ENHANCEMENT-REPORT.md)
+* [CHANGELOG.md](CHANGELOG.md)
+
+Previous version reports remain in the repository as architecture history.
