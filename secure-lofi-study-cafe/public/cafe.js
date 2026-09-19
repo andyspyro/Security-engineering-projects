@@ -27,7 +27,11 @@
   const playerStatus = document.getElementById("player-status");
   const minimizeChatButton = document.getElementById("minimize-chat");
   const chatBody = document.getElementById("chat-body");
+  const avatarStage = document.getElementById("avatar-stage");
+  const avatarLayer = document.getElementById("avatar-layer");
+  const floorMemberCount = document.getElementById("floor-member-count");
 
+  let latestMembers = [];
   let player = null;
   let youtubeReady = false;
   let playerState = null;
@@ -144,8 +148,112 @@
     return badge;
   }
 
+
+  function avatarGlyph(style) {
+    const glyphs = {
+      latte: "☕",
+      mocha: "🧸",
+      matcha: "🌿",
+      berry: "🍓",
+      sky: "☁",
+      lavender: "✦"
+    };
+
+    return glyphs[style] || "☕";
+  }
+
+  function renderAvatars(members = []) {
+    if (!avatarLayer) {
+      return;
+    }
+
+    avatarLayer.replaceChildren();
+
+    if (floorMemberCount) {
+      floorMemberCount.textContent = String(members.length);
+    }
+
+    members.forEach((member) => {
+      const avatar = document.createElement("div");
+      const style = member.avatarStyle || "latte";
+      const isCurrent = Number(member.id) === currentUserId;
+
+      avatar.className = `room-avatar avatar-${style}${isCurrent ? " is-you" : ""}`;
+      avatar.style.left = `${Number(member.avatarX || 50)}%`;
+      avatar.style.top = `${Number(member.avatarY || 50)}%`;
+      avatar.setAttribute(
+        "aria-label",
+        `${member.username}${isCurrent ? ", your avatar" : ""}`
+      );
+
+      const face = document.createElement("span");
+      face.className = "avatar-face";
+      face.textContent = avatarGlyph(style);
+
+      const label = document.createElement("span");
+      label.className = "avatar-name";
+      label.textContent = isCurrent ? `${member.username} · you` : member.username;
+
+      const state = document.createElement("span");
+      state.className = "avatar-state-dot";
+      if (member.isController) {
+        state.classList.add("controller");
+        state.title = "Room controller";
+      } else if (member.isPlaying) {
+        state.classList.add("playing");
+        state.title = "Listening";
+      } else {
+        state.title = "Online";
+      }
+
+      avatar.append(face, label, state);
+      avatarLayer.appendChild(avatar);
+    });
+  }
+
+  function moveCurrentAvatar(dx, dy) {
+    const member = latestMembers.find(
+      (candidate) => Number(candidate.id) === currentUserId
+    );
+
+    if (!member) {
+      return;
+    }
+
+    member.avatarX = Math.min(92, Math.max(8, Number(member.avatarX || 50) + dx));
+    member.avatarY = Math.min(92, Math.max(8, Number(member.avatarY || 50) + dy));
+
+    renderAvatars(latestMembers);
+
+    socket.emit("member:move", {
+      x: member.avatarX,
+      y: member.avatarY
+    });
+  }
+
+  function setCurrentAvatarStyle(style) {
+    const allowed = ["latte", "mocha", "matcha", "berry", "sky", "lavender"];
+
+    if (!allowed.includes(style)) {
+      return;
+    }
+
+    const member = latestMembers.find(
+      (candidate) => Number(candidate.id) === currentUserId
+    );
+
+    if (member) {
+      member.avatarStyle = style;
+      renderAvatars(latestMembers);
+    }
+
+    socket.emit("member:avatar", { style });
+  }
+
   function renderMembers(members = []) {
+    latestMembers = members;
     membersList.replaceChildren();
+    renderAvatars(members);
 
     if (memberCount) {
       memberCount.textContent = `${members.length} online`;
@@ -443,6 +551,58 @@
         : "Minimize Chat";
     });
   }
+
+
+  if (avatarStage) {
+    avatarStage.addEventListener("keydown", (event) => {
+      const moves = {
+        ArrowUp: [0, -5],
+        ArrowDown: [0, 5],
+        ArrowLeft: [-5, 0],
+        ArrowRight: [5, 0],
+        w: [0, -5],
+        W: [0, -5],
+        s: [0, 5],
+        S: [0, 5],
+        a: [-5, 0],
+        A: [-5, 0],
+        d: [5, 0],
+        D: [5, 0]
+      };
+
+      const move = moves[event.key];
+
+      if (!move) {
+        return;
+      }
+
+      event.preventDefault();
+      moveCurrentAvatar(move[0], move[1]);
+    });
+  }
+
+  document.querySelectorAll("[data-move]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const direction = button.dataset.move;
+      const moves = {
+        up: [0, -5],
+        down: [0, 5],
+        left: [-5, 0],
+        right: [5, 0]
+      };
+
+      const move = moves[direction];
+      if (move) {
+        moveCurrentAvatar(move[0], move[1]);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-avatar-style]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setCurrentAvatarStyle(button.dataset.avatarStyle);
+    });
+  });
 
   chatForm.addEventListener("submit", (event) => {
     event.preventDefault();
