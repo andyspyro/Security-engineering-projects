@@ -127,22 +127,54 @@ async function ensureBootstrapAdmin() {
   }
 
   const existing = await db.get(
-    "SELECT id, username, role FROM users WHERE username = ?",
+    "SELECT id, username, role, password_hash FROM users WHERE username = ?",
     [ADMIN_USERNAME]
   );
 
   if (existing) {
-    if (existing.role !== "admin") {
+    const passwordMatches = await bcrypt.compare(
+      ADMIN_PASSWORD,
+      existing.password_hash
+    );
+
+    if (existing.role !== "admin" || !passwordMatches) {
+      const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+
       await db.run(
-        "UPDATE users SET role = 'admin' WHERE id = ?",
-        [existing.id]
+        "UPDATE users SET role = 'admin', password_hash = ? WHERE id = ?",
+        [passwordHash, existing.id]
       );
+
+      if (!passwordMatches) {
+        await db.run("DELETE FROM sessions");
+      }
 
       await writeAudit(
         existing.id,
-        "admin.bootstrap_role",
-        "Promoted configured bootstrap account to permanent admin"
+        "admin.bootstrap_sync",
+        "Synchronized configured permanent admin account",
+        {
+          details: {
+            roleUpdated: existing.role !== "admin",
+            passwordRotated: !passwordMatches,
+            allSessionsInvalidated: !passwordMatches
+          }
+        }
       );
+
+      await writeSecurityEvent({
+        eventType: "admin.bootstrap_sync",
+        severity: "NOTICE",
+        actorUserId: existing.id,
+        usernameSnapshot: ADMIN_USERNAME,
+        outcome: "success",
+        route: "startup",
+        metadata: {
+          roleUpdated: existing.role !== "admin",
+          passwordRotated: !passwordMatches,
+          allSessionsInvalidated: !passwordMatches
+        }
+      });
     }
 
     return;
