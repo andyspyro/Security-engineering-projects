@@ -2,163 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <meta name="description" content="Interactive portfolio preview of the Secure Lo-Fi Study Cafe application.">
-  <title>Secure Lo-Fi Study Cafe — Live UI Demo</title>
-  <link rel="stylesheet" href="./styles.css">
-  <style>
-    .demo-notice { max-width: 1440px; margin: 0 auto; padding: .5rem clamp(1rem,3vw,2rem) 0; }
-    .demo-notice div { border: 1px solid var(--border); border-radius: 12px; padding: .75rem .9rem; background: rgba(159,211,180,.06); color: var(--muted); font-size: .86rem; }
-    .demo-player { display: grid; place-items: center; text-align: center; padding: 2rem; background:
-      radial-gradient(circle at 30% 30%, rgba(159,211,180,.20), transparent 35%),
-      linear-gradient(145deg, #111816, #070a09); }
-    .demo-player strong { display: block; margin-bottom: .4rem; font-size: clamp(1.25rem,3vw,2rem); }
-    .demo-player span { color: var(--muted); }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Secure Lo-Fi Study Cafe portfolio demo">
+  <title>Welcome Back | Secure Lo-Fi Study Cafe</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
-<body class="cafe-page">
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">Secure Lo-Fi Study Cafe</p>
-      <h1>Focus room</h1>
-    </div>
-    <div class="user-chip">
-      <span class="presence-dot" aria-hidden="true"></span>
-      <span><strong>portfolio_demo</strong> · admin</span>
-      <span class="badge">Live UI demo</span>
-    </div>
-  </header>
+<body class="auth-page">
+  <main class="auth-shell">
+    <section class="auth-card" aria-labelledby="login-title">
+      <div class="cafe-icon" aria-hidden="true">☕</div>
+      <h1 id="login-title">Welcome Back</h1>
+      <p class="auth-subtitle">Log in to enter your cozy study room.</p>
 
-  <div class="demo-notice">
-    <div>
-      This GitHub Pages build demonstrates the real application interface. Authentication, SQLite,
-      Socket.IO, CSRF enforcement, RBAC, and audit logging run in the Node.js version and are not
-      simulated as security controls in this static preview.
-    </div>
-  </div>
+      <div id="auth-error" class="alert" role="alert" hidden></div>
 
-  <main class="dashboard">
-    <section class="panel player-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Room audio</p>
-          <h2 id="now-playing-title">Late Night Coding Mix</h2>
-        </div>
-        <span class="badge">Controller: portfolio_demo</span>
-      </div>
-      <div class="player-frame demo-player">
-        <div>
-          <strong>♫ Shared player</strong>
-          <span>Synchronized YouTube playback in the full Node.js app</span>
-        </div>
-      </div>
-      <div class="player-actions">
-        <button id="sync-button" class="button primary" type="button">Sync with room</button>
-        <button id="independent-button" class="button secondary" type="button">Listen independently</button>
-        <button id="vote-button" class="button secondary" type="button">Vote next <span id="vote-count">0/2</span></button>
-      </div>
-      <p id="player-status" class="muted compact">Synced with the room controller.</p>
-    </section>
-
-    <section class="panel request-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Music request</p>
-          <h2>Add something to study to</h2>
-        </div>
-      </div>
-      <form id="request-form" class="stack-form compact-form">
-        <label>Track title
-          <input id="request-title" maxlength="100" placeholder="Deep focus mix" required>
+      <form id="auth-form" data-auth-mode="login" class="stack-form">
+        <label>
+          Username
+          <input id="username" name="username" autocomplete="username" required>
         </label>
-        <label>YouTube link
-          <input id="request-url" placeholder="https://www.youtube.com/watch?v=…" required>
+
+        <label>
+          Password
+          <input id="password" type="password" name="password" autocomplete="current-password" placeholder="Your password" required>
         </label>
-        <button class="button primary" type="submit">Submit request</button>
+
+        <div>
+          <button class="button primary" type="submit">Log In</button>
+        </div>
+
+        <p class="auth-switch">Need an account? <a href="./register.html">Register</a></p>
       </form>
-      <p class="security-note">In the full app, the backend validates the YouTube host and video ID before rebuilding a safe URL.</p>
-    </section>
 
-    <section class="panel chat-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Live chat</p>
-          <h2>Study room</h2>
-        </div>
-        <span class="badge">Demo</span>
-      </div>
-      <div id="chat-log" class="chat-log" aria-live="polite">
-        <article class="message">
-          <div class="message-meta"><strong>maya</strong><span>just now</span></div>
-          <p>Starting a 50-minute focus block. Good luck everyone.</p>
-        </article>
-        <article class="message">
-          <div class="message-meta"><strong>portfolio_demo</strong><span>just now</span></div>
-          <p>I’ll keep the room playlist moving.</p>
-        </article>
-      </div>
-      <form id="chat-form" class="chat-form">
-        <label class="sr-only" for="chat-input">Message</label>
-        <input id="chat-input" maxlength="500" autocomplete="off" placeholder="Try the demo chat…" required>
-        <button class="button primary" type="submit">Send</button>
-      </form>
-    </section>
-
-    <section class="panel members-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Presence</p>
-          <h2>Online members</h2>
-        </div>
-        <span class="badge">3 online</span>
-      </div>
-      <div class="list-stack">
-        <div class="list-item"><div class="list-item-copy"><p class="list-item-title">portfolio_demo</p><p class="list-item-meta">admin · controller · synced</p></div><span class="badge">you</span></div>
-        <div class="list-item"><div class="list-item-copy"><p class="list-item-title">maya</p><p class="list-item-meta">user · synced</p></div></div>
-        <div class="list-item"><div class="list-item-copy"><p class="list-item-title">devon</p><p class="list-item-meta">user · independent</p></div></div>
-      </div>
-    </section>
-
-    <section class="panel queue-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Shared queue</p>
-          <h2>Up next</h2>
-        </div>
-      </div>
-      <div id="queue-list" class="list-stack">
-        <div class="list-item"><div class="list-item-copy"><p class="list-item-title">Rainy Window Study Session</p><p class="list-item-meta">#1 · requested by maya</p></div></div>
-        <div class="list-item"><div class="list-item-copy"><p class="list-item-title">Coffee Shop Instrumentals</p><p class="list-item-meta">#2 · requested by devon</p></div></div>
-      </div>
-    </section>
-
-    <section class="panel history-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Recent tracks</p>
-          <h2>History</h2>
-        </div>
-      </div>
-      <div class="list-stack">
-        <div class="list-item"><div class="list-item-copy"><p class="list-item-title">Quiet Keyboard Beats</p><p class="list-item-meta">requested by portfolio_demo</p></div><span class="badge">played</span></div>
-      </div>
-    </section>
-
-    <section class="panel pending-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Moderation</p>
-          <h2>Pending requests</h2>
-        </div>
-      </div>
-      <div class="list-stack">
-        <div class="list-item">
-          <div class="list-item-copy"><p class="list-item-title">Midnight Focus</p><p class="list-item-meta">requested by maya</p></div>
-          <div class="list-actions"><button class="button primary" type="button">Approve</button><button class="button danger" type="button">Reject</button></div>
-        </div>
-      </div>
+      <p class="security-note">GitHub Pages demo: account state stays in this browser only. The real project uses Express sessions, bcrypt, SQLite, CSRF checks, and server-side role enforcement.</p>
     </section>
   </main>
 
-  <script src="./demo.js"></script>
+  <script src="./auth.js"></script>
 </body>
 </html>
