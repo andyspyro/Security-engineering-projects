@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test:security": "node scripts/security-smoke-test.js"
+    "test:security": "node scripts/security-smoke-test.js",
+    "test:realtime": "node scripts/realtime-presence-test.js"
   },
   "keywords": [
     "secure-software",
@@ -20,6 +21,9 @@
   "type": "commonjs",
   "engines": {
     "node": ">=24 <27"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
