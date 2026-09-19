@@ -66,6 +66,7 @@ jobs:
           bash -n deploy/scripts/backup-sqlite.sh
           bash -n deploy/scripts/restore-sqlite.sh
           bash -n deploy/scripts/healthcheck.sh
+          bash -n deploy/scripts/security-audit.sh
 
       - name: Verify self-hosted SQLite security schema and indexes
         run: npm run test:security
