@@ -71,5 +71,8 @@ jobs:
       - name: Verify self-hosted SQLite security schema and indexes
         run: npm run test:security
 
+      - name: Verify two-session realtime presence and RBAC
+        run: npm run test:realtime
+
       - name: Build production container
         run: docker build -f ../Dockerfile ..
