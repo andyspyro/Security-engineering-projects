@@ -8,6 +8,21 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body class="admin-page">
+  <script>
+    (() => {
+      try {
+        const session = JSON.parse(
+          sessionStorage.getItem("secureLofiDemoSession") || "null"
+        );
+
+        if (!session || session.role !== "admin") {
+          window.location.replace("./cafe.html");
+        }
+      } catch {
+        window.location.replace("./index.html");
+      }
+    })();
+  </script>
   <header class="topbar">
     <div class="brand-lockup">
       <div class="coffee-mark" aria-hidden="true">
