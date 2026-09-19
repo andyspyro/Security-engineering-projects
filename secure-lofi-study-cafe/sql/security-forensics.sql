@@ -1,8 +1,8 @@
 -- Secure Lo-Fi Study Cafe
--- Security Engineering v3.1
--- SQLite forensic and operational queries.
+-- Security Engineering v3.2
+-- Turso/libSQL forensic and operational queries.
 --
--- These queries are intended for the application's local SQLite database.
+-- These queries target the application's Turso/libSQL schema and also work with the local libSQL development database.
 -- They avoid password hashes, session tokens, CSRF tokens, and profile-image data.
 
 PRAGMA foreign_keys = ON;
