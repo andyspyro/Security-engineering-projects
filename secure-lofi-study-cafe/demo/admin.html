@@ -7,7 +7,30 @@
   <title>Admin Console | Secure Lo-Fi Study Cafe</title>
   <link rel="stylesheet" href="./style.css">
 </head>
-<body class="admin-page">
+<body class="admin-page" hidden>
+  <script>
+    (() => {
+      try {
+        const session = JSON.parse(
+          sessionStorage.getItem("secureLofiDemoSession") || "null"
+        );
+
+        const authorized =
+          session &&
+          String(session.username || "").toLowerCase() === "admin" &&
+          session.role === "admin";
+
+        if (!authorized) {
+          window.location.replace("./cafe.html");
+          return;
+        }
+
+        document.body.hidden = false;
+      } catch {
+        window.location.replace("./index.html");
+      }
+    })();
+  </script>
   <header class="topbar">
     <div>
       <p class="eyebrow">Permanent Admin</p>
