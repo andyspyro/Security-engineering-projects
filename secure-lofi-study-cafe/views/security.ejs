@@ -16,9 +16,9 @@
         <span class="coffee-cup">☕</span>
       </div>
       <div>
-        <p class="eyebrow">Security Engineering v3.1</p>
+        <p class="eyebrow">Security Engineering v4.0</p>
         <h1>Backend Security Architecture</h1>
-        <p class="session-line">Node.js · Express · Turso/libSQL · Socket.IO · EJS</p>
+        <p class="session-line">Node.js 24 LTS · Express · SQLite · Socket.IO · systemd</p>
       </div>
     </div>
 
@@ -62,8 +62,8 @@
 
       <article class="panel security-control-card">
         <p class="eyebrow">Database</p>
-        <h2>Parameterized Turso / libSQL</h2>
-        <p>Application data and security telemetry are stored in Turso/libSQL. User-controlled values are passed through placeholders instead of SQL string concatenation.</p>
+        <h2>Parameterized SQLite</h2>
+        <p>Application data, server-side sessions, audit records, and security telemetry are stored locally in SQLite WAL mode. User-controlled values are passed through placeholders instead of SQL string concatenation.</p>
         <code>SELECT ... WHERE username = ?</code>
       </article>
 
@@ -86,6 +86,27 @@
         <h2>CSV injection defense</h2>
         <p>Admin audit exports neutralize spreadsheet formula prefixes before user-controlled values are written to CSV.</p>
         <code>= + - @ → prefixed before export</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Host hardening</p>
+        <h2>Least-privilege Linux service</h2>
+        <p>The application runs as a dedicated non-login user under systemd with filesystem, device, kernel, namespace, and privilege restrictions. Only the SQLite data directory is writable.</p>
+        <code>systemd sandbox · NoNewPrivileges · ProtectSystem=strict</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Data durability</p>
+        <h2>WAL + verified backups</h2>
+        <p>SQLite uses WAL mode and foreign-key enforcement. Daily online backups are integrity-checked, compressed, checksummed, retained separately, and paired with a verified restore workflow.</p>
+        <code>WAL · PRAGMA quick_check · SHA-256 · systemd timer</code>
+      </article>
+
+      <article class="panel security-control-card">
+        <p class="eyebrow">Network boundary</p>
+        <h2>Node is not the public edge</h2>
+        <p>Public deployments bind Node to localhost and place Caddy or an outbound Cloudflare Tunnel in front. LAN mode can bind to the private interface with firewall restrictions.</p>
+        <code>127.0.0.1:3000 · HTTPS proxy/tunnel · UFW</code>
       </article>
     </section>
 
@@ -193,7 +214,7 @@ ORDER BY created_at ASC;</code></pre>
 
                     │
                     ▼
-                 Turso/libSQL
+                    SQLite
         ┌───────────┼────────────┐
         │           │            │
    app records   audit_logs  security_events
