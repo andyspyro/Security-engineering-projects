@@ -35,15 +35,17 @@ jobs:
           node --check server.js
           node --check database.js
           node --check public/cafe.js
+          node --check public/admin.js
           node --check demo/auth.js
           node --check demo/demo.js
+          node --check demo/admin-demo.js
 
       - name: Compile EJS templates
         run: |
           node - <<'NODE'
           const fs = require("fs");
           const ejs = require("ejs");
-          for (const file of ["views/register.ejs", "views/login.ejs", "views/cafe.ejs"]) {
+          for (const file of ["views/register.ejs", "views/login.ejs", "views/cafe.ejs", "views/admin.ejs"]) {
             ejs.compile(fs.readFileSync(file, "utf8"), { filename: file });
             console.log("Compiled:", file);
           }
