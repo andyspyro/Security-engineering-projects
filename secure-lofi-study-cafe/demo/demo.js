@@ -17,11 +17,35 @@
   }
 
   const isAdmin = session.role === "admin";
+  const AUDIT_KEY = "secureLofiDemoAudit";
+
+  function logAudit(eventType, action, details = {}) {
+    let audit = [];
+
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]");
+      audit = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      audit = [];
+    }
+
+    audit.push({
+      timestamp: new Date().toISOString(),
+      eventType,
+      actor: session.username,
+      role: session.role,
+      action,
+      details
+    });
+
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(audit.slice(-1000)));
+  }
 
   const usernameEl = document.getElementById("session-username");
   const roleEl = document.getElementById("session-role");
   const controllerName = document.getElementById("controller-name");
   const logoutButton = document.getElementById("logout-button");
+  const adminConsoleLink = document.getElementById("admin-console-link");
   const queueList = document.getElementById("queue-list");
   const historyList = document.getElementById("history-list");
   const pendingList = document.getElementById("pending-list");
@@ -47,6 +71,10 @@
   usernameEl.textContent = session.username;
   roleEl.textContent = session.role;
   controllerName.textContent = session.username;
+
+  if (adminConsoleLink) {
+    adminConsoleLink.hidden = !isAdmin;
+  }
 
   const members = [
     {
@@ -225,6 +253,14 @@
               member.tempAdmin = !member.tempAdmin;
               member.controller = member.tempAdmin;
 
+              logAudit(
+                member.tempAdmin ? "admin.temp_grant" : "admin.temp_revoke",
+                member.tempAdmin
+                  ? `Granted temporary admin/controller to ${member.username}`
+                  : `Removed temporary admin/controller from ${member.username}`,
+                { target: member.username }
+              );
+
               if (member.tempAdmin) {
                 members[0].controller = false;
                 controllerName.textContent = member.username;
@@ -275,7 +311,13 @@
           makeButton("Down", "secondary", () => moveTrack(index, 1)),
           makeButton("Play Now", "secondary", () => playTrack(index)),
           makeButton("Remove", "danger", () => {
+            const removed = queue[index];
             queue.splice(index, 1);
+            logAudit(
+              "music.queue_remove",
+              `Removed ${removed.title} from shared playlist`,
+              { title: removed.title, requestedBy: removed.requestedBy }
+            );
             renderQueue();
           })
         );
@@ -312,12 +354,22 @@
         makeButton("Approve", "primary", () => {
           queue.push(track);
           pending.splice(index, 1);
+          logAudit(
+            "music.approve",
+            `Approved music request: ${track.title}`,
+            { title: track.title, requestedBy: track.requestedBy, videoId: track.videoId }
+          );
           requestFeedback.textContent = `${track.title} was approved and added to the shared playlist.`;
           renderPending();
           renderQueue();
         }),
         makeButton("Reject", "danger", () => {
           pending.splice(index, 1);
+          logAudit(
+            "music.reject",
+            `Rejected music request: ${track.title}`,
+            { title: track.title, requestedBy: track.requestedBy, videoId: track.videoId }
+          );
           requestFeedback.textContent = `${track.title} was rejected.`;
           renderPending();
         })
@@ -363,7 +415,13 @@
       return;
     }
 
+    const moved = queue[index];
     [queue[index], queue[target]] = [queue[target], queue[index]];
+    logAudit(
+      "music.queue_reorder",
+      `Moved ${moved.title} in the shared playlist`,
+      { title: moved.title, from: index + 1, to: target + 1 }
+    );
     renderQueue();
   }
 
@@ -392,6 +450,12 @@
     }
 
     currentTrack = queue.splice(index, 1)[0];
+
+    logAudit(
+      "music.play",
+      `Started track: ${currentTrack.title}`,
+      { title: currentTrack.title, requestedBy: currentTrack.requestedBy, videoId: currentTrack.videoId }
+    );
 
     nowPlayingTitle.textContent = currentTrack.title;
     requestedByLine.textContent = `Requested by ${currentTrack.requestedBy}`;
@@ -477,6 +541,12 @@
 
     pending.push(request);
 
+    logAudit(
+      "music.request",
+      `Submitted music request: ${title}`,
+      { title, videoId, requestedBy: session.username }
+    );
+
     requestFeedback.textContent = isAdmin
       ? `${title} is waiting for admin approval below.`
       : `${title} was submitted and is waiting for an admin.`;
@@ -495,11 +565,17 @@
     }
 
     appendChat(text);
+    logAudit(
+      "chat.message",
+      "Sent chat message",
+      { message: isAdmin ? text : censorBadWords(text) }
+    );
     chatInput.value = "";
   });
 
   document.getElementById("sync-button").addEventListener("click", () => {
     followingRoom = true;
+    logAudit("player.sync", "Synced to room controller");
     playerStatus.textContent = "You are synced to the room controller.";
   });
 
@@ -507,12 +583,14 @@
     .getElementById("independent-button")
     .addEventListener("click", () => {
       followingRoom = false;
+      logAudit("player.independent", "Switched to independent listening");
       playerStatus.textContent =
         "Independent listening enabled. Use Sync to Controller to rejoin.";
     });
 
   document.getElementById("vote-button").addEventListener("click", () => {
     votes = Math.min(votes + 1, 2);
+    logAudit("player.vote_next", "Voted to advance to the next track");
     voteCount.textContent = `${votes}/2`;
 
     if (votes >= 2) {
@@ -530,6 +608,7 @@
   });
 
   logoutButton.addEventListener("click", () => {
+    logAudit("auth.logout", "Logged out");
     sessionStorage.removeItem(SESSION_KEY);
     window.location.href = "./index.html";
   });
