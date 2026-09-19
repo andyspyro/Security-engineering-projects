@@ -178,39 +178,9 @@
     }
 
     if (mode === "register") {
-      if (username.toLowerCase() === SHOWCASE_ADMIN.username) {
-        showError("That username is reserved for the cross-device showcase administrator.");
-        return;
-      }
-
-      const exists = accounts.some(
-        (account) => account.username.toLowerCase() === username.toLowerCase()
+      showError(
+        "Shared account registration is available only on the live self-hosted server. GitHub Pages cannot create cross-device users."
       );
-
-      if (exists) {
-        showError("Username is already taken.");
-        return;
-      }
-
-      const salt = crypto.getRandomValues(new Uint8Array(16));
-      const derived = await derivePassword(password, salt);
-
-      const account = {
-        username,
-        role: "user",
-        createdAt: new Date().toISOString(),
-        salt: bytesToBase64(salt),
-        verifier: bytesToBase64(derived)
-      };
-
-      accounts.push(account);
-      saveAccounts(accounts);
-      logAudit(
-        account,
-        "account.register",
-        `Account registered as ${account.role}`
-      );
-      startSession(account);
       return;
     }
 
@@ -237,26 +207,8 @@
       return;
     }
 
-    const account = accounts.find(
-      (candidate) =>
-        candidate.username.toLowerCase() === username.toLowerCase()
+    showError(
+      "Normal-user login is available only on the live self-hosted server. The GitHub Pages site does not share accounts between devices."
     );
-
-    if (!account) {
-      showError("Invalid username or password.");
-      return;
-    }
-
-    const derived = await derivePassword(
-      password,
-      base64ToBytes(account.salt)
-    );
-
-    if (!sameBytes(derived, base64ToBytes(account.verifier))) {
-      showError("Invalid username or password.");
-      return;
-    }
-
-    startSession(account);
   });
 })();
