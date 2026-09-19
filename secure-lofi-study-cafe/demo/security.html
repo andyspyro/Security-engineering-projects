@@ -40,9 +40,9 @@
         <span class="coffee-cup">☕</span>
       </div>
       <div>
-        <p class="eyebrow">Security Engineering v3.1</p>
+        <p class="eyebrow">Security Engineering v4.0</p>
         <h1>Backend Security Architecture</h1>
-        <p class="session-line">Node.js · Express · Turso/libSQL · Socket.IO · EJS</p>
+        <p class="session-line">Node.js 24 LTS · Express · SQLite · Socket.IO · systemd</p>
       </div>
     </div>
 
@@ -58,7 +58,7 @@
       <article class="panel security-control-card"><p class="eyebrow">Authorization</p><h2>Role enforcement</h2><p>Permanent-admin and moderator checks execute on protected server routes. UI visibility is not treated as authorization.</p><code>requireLogin · requireModerator · requirePermanentAdmin</code></article>
       <article class="panel security-control-card"><p class="eyebrow">Request integrity</p><h2>CSRF and correlation</h2><p>State-changing HTTP operations require a session-bound CSRF token. Requests receive UUID correlation IDs.</p><code>32-byte CSRF token · X-Request-ID</code></article>
       <article class="panel security-control-card"><p class="eyebrow">Abuse control</p><h2>Rate limiting</h2><p>Authentication endpoints use tighter limits and blocked attempts become structured security events.</p><code>express-rate-limit · outcome=blocked</code></article>
-      <article class="panel security-control-card"><p class="eyebrow">Database</p><h2>Parameterized Turso / libSQL</h2><p>Application records and security telemetry are stored in Turso/libSQL using placeholders for user-controlled values.</p><code>SELECT ... WHERE username = ?</code></article>
+      <article class="panel security-control-card"><p class="eyebrow">Database</p><h2>Parameterized SQLite</h2><p>Application records and security telemetry are stored in self-hosted SQLite using placeholders for user-controlled values.</p><code>SELECT ... WHERE username = ?</code></article>
       <article class="panel security-control-card"><p class="eyebrow">Output security</p><h2>XSS-resistant rendering</h2><p>EJS escapes normal output. Live chat and avatar bubbles use textContent, with CSP headers in the full backend.</p><code>EJS · textContent · Helmet CSP</code></article>
       <article class="panel security-control-card"><p class="eyebrow">Uploads</p><h2>Image validation</h2><p>Profile images are restricted to PNG, JPEG, and WebP, capped at 512 KB, and checked by binary signature.</p><code>allowlist · magic bytes · size cap</code></article>
       <article class="panel security-control-card"><p class="eyebrow">Export safety</p><h2>CSV injection defense</h2><p>Admin exports neutralize spreadsheet formula prefixes before user-controlled values are written to CSV.</p><code>= + - @ neutralization</code></article>
@@ -120,7 +120,7 @@ ORDER BY created_at ASC;</code></pre>
 
                     │
                     ▼
-                 Turso/libSQL
+                    SQLite
         app data · audit_logs · security_events
                     indexed forensic queries</code></pre>
     </section>
