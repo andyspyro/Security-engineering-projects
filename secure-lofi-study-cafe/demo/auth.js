@@ -16,6 +16,13 @@
   const SESSION_KEY = "secureLofiDemoSession";
   const AUDIT_KEY = "secureLofiDemoAudit";
 
+  const SHOWCASE_ADMIN = Object.freeze({
+    username: "admin",
+    password: "admin12345",
+    role: "admin",
+    createdAt: "Built-in cross-device showcase account"
+  });
+
   function logAudit(account, eventType, action, details = {}) {
     let audit = [];
 
@@ -160,7 +167,7 @@
 
       const account = {
         username,
-        role: accounts.length === 0 ? "admin" : "user",
+        role: "user",
         createdAt: new Date().toISOString(),
         salt: bytesToBase64(salt),
         verifier: bytesToBase64(derived)
@@ -174,6 +181,29 @@
         `Account registered as ${account.role}`
       );
       startSession(account);
+      return;
+    }
+
+    if (
+      username.toLowerCase() === SHOWCASE_ADMIN.username &&
+      password === SHOWCASE_ADMIN.password
+    ) {
+      const existingShowcase = accounts.find(
+        (candidate) =>
+          candidate.username.toLowerCase() === SHOWCASE_ADMIN.username
+      );
+
+      if (!existingShowcase) {
+        accounts.unshift({
+          username: SHOWCASE_ADMIN.username,
+          role: SHOWCASE_ADMIN.role,
+          createdAt: SHOWCASE_ADMIN.createdAt,
+          showcase: true
+        });
+        saveAccounts(accounts);
+      }
+
+      startSession(SHOWCASE_ADMIN);
       return;
     }
 
