@@ -1,5 +1,35 @@
 # Changelog
 
+## 4.0.1 — Realtime Presence Reliability
+
+### Realtime
+
+* Moved Socket.IO authentication onto the shared Engine.IO/Express session middleware.
+* Added a complete server-authoritative `room:snapshot`.
+* Added explicit `room:sync-request` handling after every browser connection/reconnection.
+* Kept join/leave presence broadcasts authoritative on the Node server.
+* Added client connection-error/synchronization status.
+
+### Static Pages correction
+
+* Disabled browser-local normal-user registration on GitHub Pages.
+* Disabled browser-local normal-user login on GitHub Pages.
+* Removed fake remote members and fake live chat from the static preview.
+* Clarified that cross-device accounts require the self-hosted Node server.
+
+### Automated verification
+
+* Added `scripts/realtime-presence-test.js`.
+* CI now launches a real server with two independent authenticated sessions.
+* The test proves admin sees bunny join in realtime.
+* The test proves bunny sees admin.
+* The test proves bunny chat reaches admin over Socket.IO.
+* The test proves bunny receives HTTP 403 for `/admin`.
+* The test proves the admin receives HTTP 200 for `/admin`.
+* The test proves disconnect presence is broadcast.
+
+* Added `REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md`.
+
 ## 4.0.0 — Self-Hosted Security Engineering Server
 
 ### Runtime
