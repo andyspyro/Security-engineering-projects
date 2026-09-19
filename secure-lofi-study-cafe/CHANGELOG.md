@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.2.0 — Free Shared Persistence with Koyeb and Turso
+
+### Database
+
+* Replaced the production-local `sqlite3` driver with `@libsql/client`.
+* Added Turso remote database support with `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`.
+* Preserved local SQLite-compatible development through `file:lofi_cafe.db`.
+* Preserved parameterized SQL, schema migrations, security indexes, audit logs, and forensic queries.
+* Migrated Express sessions to the shared libSQL database.
+
+### Free deployment
+
+* Reworked the production Docker image for Koyeb's Free Web Service.
+* Removed the requirement for a paid/persistent web-server volume.
+* Moved durable state to Turso so Koyeb can restart or sleep without losing users or logs.
+* Added `KOYEB-TURSO-DEPLOYMENT.md`.
+* Added Security Engineering Report v3.2.
+
+### CI
+
+* Updated the security smoke test to exercise `@libsql/client`.
+* Verifies tables, indexes, sessions, security events, and query plans using the same database API as production.
+* Production Docker image continues to build in GitHub Actions.
+
 ## 3.1.0 — Shared Backend, Persistent Sessions, and Production RBAC
 
 ### Cross-device behavior
