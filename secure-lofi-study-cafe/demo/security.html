@@ -7,7 +7,7 @@
   <title>Security Engineering | Secure Lo-Fi Study Cafe</title>
   <link rel="stylesheet" href="./style.css">
 </head>
-<body class="admin-page">
+<body class="admin-page" hidden>
   <script>
     (() => {
       try {
@@ -15,13 +15,17 @@
           sessionStorage.getItem("secureLofiDemoSession") || "null"
         );
 
-        if (
-          !session ||
-          String(session.username || "").toLowerCase() !== "admin" ||
-          session.role !== "admin"
-        ) {
+        const authorized =
+          session &&
+          String(session.username || "").toLowerCase() === "admin" &&
+          session.role === "admin";
+
+        if (!authorized) {
           window.location.replace("./cafe.html");
+          return;
         }
+
+        document.body.hidden = false;
       } catch {
         window.location.replace("./index.html");
       }
