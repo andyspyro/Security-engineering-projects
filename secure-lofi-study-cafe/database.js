@@ -1,6 +1,8 @@
 const sqlite3 = require("sqlite3").verbose();
 
-const db = new sqlite3.Database("./lofi_cafe.db", (err) => {
+const DB_PATH = process.env.DB_PATH || "./lofi_cafe.db";
+
+const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
     console.error("Database connection failed.");
     process.exit(1);
@@ -75,6 +77,20 @@ db.serialize(() => {
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (target_user_id) REFERENCES users(id)
     )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      sid TEXT PRIMARY KEY,
+      sess TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires_at
+    ON sessions(expires_at)
   `);
 
   db.run(`
