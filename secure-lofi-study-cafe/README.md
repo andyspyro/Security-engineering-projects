@@ -1,6 +1,6 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 4.0.0  
+> **Release:** 4.0.1  
 > **Type:** self-hosted secure realtime web application  
 > **Runtime:** Node.js 24 LTS, Express, EJS, Socket.IO  
 > **Persistence:** self-hosted SQLite in WAL mode  
@@ -333,6 +333,21 @@ It contains investigation queries for:
 
 Avatar X/Y movement is transient and intentionally not persisted to the audit database.
 
+## Realtime presence guarantee
+
+The Node backend now sends a full authoritative room snapshot at initial connection and after reconnect. Every join/leave also broadcasts `presence:update` to all connected clients.
+
+CI includes a two-session integration test that logs in `admin` and `bunny` independently and verifies:
+
+* admin sees bunny join;
+* bunny sees admin;
+* bunny's chat reaches admin in realtime;
+* bunny cannot access `/admin`;
+* admin can access `/admin`;
+* bunny disappearing from the room is broadcast when the socket disconnects.
+
+See [REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md](REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md).
+
 ## Acceptance test
 
 ### Admin computer
@@ -374,6 +389,7 @@ With both clients connected to the same self-hosted server, each should see the 
 | [deploy/scripts/security-audit.sh](deploy/scripts/security-audit.sh) | host/application security verification |
 | [SELF-HOSTING.md](SELF-HOSTING.md) | full operations runbook |
 | [SECURITY-ENGINEERING-REPORT-v4.0.md](SECURITY-ENGINEERING-REPORT-v4.0.md) | v4 architecture/security report |
+| [REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md](REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md) | realtime root cause, repair, and two-session validation |
 | [CHANGELOG.md](CHANGELOG.md) | release history |
 
 ## CI validation
