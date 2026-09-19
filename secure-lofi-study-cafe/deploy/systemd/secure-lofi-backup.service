@@ -1,0 +1,17 @@
+[Unit]
+Description=Backup Secure Lo-Fi Study Cafe SQLite database
+After=secure-lofi-study-cafe.service
+
+[Service]
+Type=oneshot
+User=securelofi
+Group=securelofi
+ExecStart=/opt/secure-lofi-study-cafe/deploy/scripts/backup-sqlite.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/secure-lofi-study-cafe /var/backups/secure-lofi-study-cafe
