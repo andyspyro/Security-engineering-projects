@@ -16,6 +16,7 @@ db.serialize(() => {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'user',
+      avatar_image TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -75,6 +76,15 @@ db.serialize(() => {
       FOREIGN KEY (target_user_id) REFERENCES users(id)
     )
   `);
+
+  db.run(
+    `ALTER TABLE users ADD COLUMN avatar_image TEXT`,
+    (err) => {
+      if (err && !err.message.includes("duplicate column name")) {
+        console.error("Migration error:", err.message);
+      }
+    }
+  );
 
   db.run(
     `ALTER TABLE music_requests ADD COLUMN start_seconds INTEGER NOT NULL DEFAULT 0`,
