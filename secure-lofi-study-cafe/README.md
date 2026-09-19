@@ -1,8 +1,8 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 3.1.0  
+> **Release:** 3.2.0  
 > **Type:** Full-stack secure realtime web application  
-> **Stack:** Node.js, Express, SQLite, EJS, Socket.IO  
+> **Stack:** Node.js, Express, Turso/libSQL, EJS, Socket.IO  
 > **Security focus:** authentication, sessions, RBAC, CSRF, parameterized SQL, structured security telemetry, audit logging, secure uploads, moderation, and incident reconstruction
 
 ## Live showcase
@@ -20,11 +20,11 @@ The public GitHub Pages site is static. The built-in administrator above is only
 
 Accounts created through the Pages registration form remain browser-local because GitHub Pages does not run Node.js, Socket.IO, or SQLite.
 
-The production architecture is the full backend in this directory. When deployed to Railway, every device connects to the same account database, persistent session store, Socket.IO room, RBAC rules, audit trail, and security-event database. That is the deployment in which an administrator on a computer can see a normal user such as `bunny` join from a phone.
+The production architecture is the full backend in this directory. Koyeb runs the Node.js/Socket.IO service and Turso provides the shared SQL database. Every device therefore connects to the same users, sessions, room, RBAC rules, audit trail, and security-event data.
 
-## Version 3.1 shared backend and security engineering
+## Version 3.2 free shared backend and security engineering
 
-Version 3.0 adds a dedicated SQLite security telemetry pipeline alongside the existing application audit trail.
+Version 3.2 keeps the structured SQL security telemetry pipeline while moving shared persistence to Turso/libSQL so the real multi-user backend can run without a paid persistent web-server volume.
 
 ### Structured SQL security events
 
@@ -295,47 +295,52 @@ http://localhost:3000
 
 Public registration always creates a normal `user` account. Permanent administrator provisioning is explicit and server-controlled.
 
-## Railway production deployment
+## Free production deployment
 
-The repository root contains a production `Dockerfile` for the full Node.js backend. Railway auto-detects a root Dockerfile for GitHub-backed services. Healthcheck, volume, variables, and public networking are configured in the Railway service settings.
+Use:
 
-Required Railway variables:
+```text
+Koyeb Free Web Service
+        |
+        | Node.js / Express / Socket.IO
+        v
+Turso / libSQL
+```
+
+Required Koyeb variables:
 
 ```text
 NODE_ENV=production
 SESSION_SECRET=<strong random secret>
 ADMIN_USERNAME=<private permanent-admin username>
 ADMIN_PASSWORD=<private password, 12+ characters>
-DB_PATH=/data/lofi_cafe.db
+TURSO_DATABASE_URL=<Turso database URL>
+TURSO_AUTH_TOKEN=<Turso database token>
 ```
 
-Railway supplies `PORT`.
+Koyeb supplies `PORT` automatically.
 
-Attach a Railway persistent volume to the service at:
+No Koyeb persistent volume is required because users, sessions, messages, audit records, and security telemetry live in Turso.
 
-```text
-/data
-```
-
-The application uses `/healthz` as a database-aware deployment healthcheck.
-
-With that topology, desktop and mobile users share the same SQL accounts, Express sessions, Socket.IO presence/chat, administrator permissions, and audit/security logs.
+See [KOYEB-TURSO-DEPLOYMENT.md](KOYEB-TURSO-DEPLOYMENT.md) for the complete deployment and cross-device verification procedure.
 
 ## Repository map
 
 | File | Purpose |
 |---|---|
 | [server.js](server.js) | HTTP routes, authentication, sessions, CSRF, RBAC, Socket.IO, security telemetry |
-| [database.js](database.js) | SQLite initialization, tables, migrations, indexes, query helpers |
+| [database.js](database.js) | Turso/libSQL client, schema initialization, migrations, indexes, query helpers |
 | [schema.sql](schema.sql) | documented relational/security schema |
 | [sql/security-forensics.sql](sql/security-forensics.sql) | investigation and incident-response SQL |
 | [views/admin.ejs](views/admin.ejs) | permanent-admin audit/security console |
 | [views/security.ejs](views/security.ejs) | backend security architecture interface |
 | [public/cafe.js](public/cafe.js) | realtime client behavior |
 | [public/style.css](public/style.css) | responsive café/security interface |
-| [sqlite-session-store.js](sqlite-session-store.js) | persistent SQLite-backed Express session store |
-| [scripts/security-smoke-test.js](scripts/security-smoke-test.js) | in-memory SQLite security validation |
-| [SECURITY-ENGINEERING-REPORT-v3.1.md](SECURITY-ENGINEERING-REPORT-v3.1.md) | latest shared-backend/security engineering report |
+| [libsql-session-store.js](libsql-session-store.js) | persistent SQL-backed Express session store |
+| [scripts/security-smoke-test.js](scripts/security-smoke-test.js) | disposable libSQL security/database validation |
+| [SECURITY-ENGINEERING-REPORT-v3.2.md](SECURITY-ENGINEERING-REPORT-v3.2.md) | latest free shared-backend/security engineering report |
+| [KOYEB-TURSO-DEPLOYMENT.md](KOYEB-TURSO-DEPLOYMENT.md) | free production deployment runbook |
+| [SECURITY-ENGINEERING-REPORT-v3.1.md](SECURITY-ENGINEERING-REPORT-v3.1.md) | version 3.1 shared-backend report |
 | [SECURITY-ENGINEERING-REPORT-v3.0.md](SECURITY-ENGINEERING-REPORT-v3.0.md) | version 3.0 telemetry/security report |
 | [CHANGELOG.md](CHANGELOG.md) | release history |
 | [UI-UX-ENHANCEMENT-REPORT.md](UI-UX-ENHANCEMENT-REPORT.md) | interface, mobile, avatar, and accessibility design |
@@ -348,4 +353,4 @@ Security decisions were cross-checked against:
 * OWASP Session Management Cheat Sheet
 * OWASP File Upload Cheat Sheet
 
-Full links and implementation mapping are documented in [SECURITY-ENGINEERING-REPORT-v3.1.md](SECURITY-ENGINEERING-REPORT-v3.1.md).
+Full implementation mapping is documented in [SECURITY-ENGINEERING-REPORT-v3.2.md](SECURITY-ENGINEERING-REPORT-v3.2.md).
