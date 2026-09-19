@@ -180,9 +180,30 @@ const generalLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: "Too many login or registration attempts. Please try again later.",
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  handler: async (req, res) => {
+    try {
+      await recordRequestSecurityEvent(
+        req,
+        "auth.rate_limit",
+        "WARNING",
+        "blocked",
+        {
+          attemptedUsername:
+            req.body && req.body.username
+              ? String(req.body.username).slice(0, 30)
+              : null
+        }
+      );
+    } catch (err) {
+      console.error("Rate-limit security log error:", err);
+    }
+
+    res
+      .status(429)
+      .send("Too many login or registration attempts. Please try again later.");
+  }
 });
 
 app.use(generalLimiter);
@@ -205,6 +226,13 @@ const sessionMiddleware = session({
 
 app.use(sessionMiddleware);
 
+app.use((req, res, next) => {
+  req.requestId = crypto.randomUUID();
+  req.sessionRef = makeSessionRef(req.sessionID);
+  res.setHeader("X-Request-ID", req.requestId);
+  next();
+});
+
 io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
 });
@@ -226,6 +254,14 @@ app.use((req, res, next) => {
 
 function verifyCsrf(req, res, next) {
   if (!req.body._csrf || req.body._csrf !== req.session.csrfToken) {
+    recordRequestSecurityEvent(
+      req,
+      "csrf.validation_failed",
+      "HIGH",
+      "blocked",
+      { reason: "missing_or_mismatched_token" }
+    ).catch((err) => console.error("CSRF security log error:", err));
+
     return res.status(403).send("Invalid security token.");
   }
 
@@ -238,6 +274,13 @@ function verifyCsrf(req, res, next) {
 
 function requireLogin(req, res, next) {
   if (!req.session.user) {
+    recordRequestSecurityEvent(
+      req,
+      "authorization.authentication_required",
+      "NOTICE",
+      "blocked"
+    ).catch((err) => console.error("Authentication-required log error:", err));
+
     return res.redirect("/login");
   }
 
@@ -257,6 +300,13 @@ function isModerator(user) {
 
 function requireModerator(req, res, next) {
   if (!isModerator(req.session.user)) {
+    recordRequestSecurityEvent(
+      req,
+      "authorization.moderator_denied",
+      "HIGH",
+      "blocked"
+    ).catch((err) => console.error("Moderator-denial log error:", err));
+
     return res.status(403).send("Access denied.");
   }
 
@@ -265,6 +315,13 @@ function requireModerator(req, res, next) {
 
 function requirePermanentAdmin(req, res, next) {
   if (!isPermanentAdmin(req.session.user)) {
+    recordRequestSecurityEvent(
+      req,
+      "authorization.admin_denied",
+      "HIGH",
+      "blocked"
+    ).catch((err) => console.error("Admin-denial log error:", err));
+
     return res.status(403).send("Only permanent admins can do that.");
   }
 
@@ -358,6 +415,108 @@ async function writeAudit(
       safeDetails
     ]
   );
+}
+
+function makeSessionRef(sessionId) {
+  if (!sessionId) {
+    return null;
+  }
+
+  return crypto
+    .createHmac("sha256", SESSION_SECRET)
+    .update(String(sessionId))
+    .digest("hex")
+    .slice(0, 24);
+}
+
+function normalizeSeverity(value) {
+  const severity = String(value || "INFO").toUpperCase();
+  return ["INFO", "NOTICE", "WARNING", "HIGH"].includes(severity)
+    ? severity
+    : "INFO";
+}
+
+async function writeSecurityEvent({
+  eventType,
+  severity = "INFO",
+  actorUserId = null,
+  usernameSnapshot = null,
+  targetUserId = null,
+  outcome = "success",
+  httpMethod = null,
+  route = null,
+  requestId = null,
+  sessionRef = null,
+  metadata = null
+}) {
+  const safeMetadata =
+    metadata === null || metadata === undefined
+      ? null
+      : JSON.stringify(metadata).slice(0, 6000);
+
+  await db.run(
+    `
+    INSERT INTO security_events (
+      event_uuid,
+      event_type,
+      severity,
+      actor_user_id,
+      username_snapshot,
+      target_user_id,
+      outcome,
+      http_method,
+      route,
+      request_id,
+      session_ref,
+      metadata
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      crypto.randomUUID(),
+      String(eventType || "security.event").slice(0, 100),
+      normalizeSeverity(severity),
+      actorUserId || null,
+      usernameSnapshot ? String(usernameSnapshot).slice(0, 60) : null,
+      targetUserId || null,
+      String(outcome || "success").slice(0, 30),
+      httpMethod ? String(httpMethod).slice(0, 12) : null,
+      route ? String(route).slice(0, 200) : null,
+      requestId ? String(requestId).slice(0, 80) : null,
+      sessionRef ? String(sessionRef).slice(0, 64) : null,
+      safeMetadata
+    ]
+  );
+}
+
+async function recordRequestSecurityEvent(
+  req,
+  eventType,
+  severity = "INFO",
+  outcome = "success",
+  metadata = null,
+  targetUserId = null
+) {
+  const sessionUser = req.session && req.session.user;
+
+  return writeSecurityEvent({
+    eventType,
+    severity,
+    actorUserId: sessionUser ? sessionUser.id : null,
+    usernameSnapshot:
+      sessionUser && sessionUser.username
+        ? sessionUser.username
+        : metadata && metadata.attemptedUsername
+          ? metadata.attemptedUsername
+          : null,
+    targetUserId,
+    outcome,
+    httpMethod: req.method,
+    route: req.route && req.route.path ? req.route.path : req.path,
+    requestId: req.requestId || null,
+    sessionRef: req.sessionRef || makeSessionRef(req.sessionID),
+    metadata
+  });
 }
 
 function csvCell(value) {
