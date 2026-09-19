@@ -1,5 +1,51 @@
 # Changelog
 
+## 4.0.0 — Self-Hosted Security Engineering Server
+
+### Runtime
+
+* Moved the authoritative backend to a self-hosted Linux deployment model.
+* Standardized on Node.js 24 LTS.
+* Added explicit `HOST`, `TRUST_PROXY`, and `COOKIE_SECURE` runtime controls.
+* Added graceful SIGTERM/SIGINT handling with SQLite checkpoint/close behavior.
+* Removed the production dependency on Koyeb/Turso.
+
+### SQLite
+
+* Restored local `sqlite3` persistence.
+* Enabled WAL mode, foreign keys, NORMAL synchronous mode, and a 5-second busy timeout.
+* Kept SQL-backed Express sessions, security telemetry, audit logs, and forensic queries.
+* Added SQLite quick-check verification in CI.
+
+### Linux hardening
+
+* Added an interactive Ubuntu/Debian self-host installer.
+* Added a dedicated non-login `securelofi` service account.
+* Added a hardened systemd unit using `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, private devices/tmp, dropped capabilities, and a restricted writable database path.
+* Added a host security-audit script using service-state checks, socket inspection, permissions, SQLite integrity, UFW status, and `systemd-analyze security`.
+
+### Network security
+
+* Added LAN-only deployment guidance with subnet-scoped UFW rules.
+* Added Caddy reverse-proxy configuration for HTTPS/public deployments.
+* Added Cloudflare Tunnel configuration for outbound-only public ingress.
+* Documented that Node port 3000 should not be directly forwarded to the Internet.
+
+### Backup and recovery
+
+* Added a daily systemd backup timer.
+* Added SQLite online backups using the CLI `.backup` operation.
+* Added backup `PRAGMA quick_check`, gzip compression, SHA-256 checksums, permissions, and retention.
+* Added a restore script with checksum/integrity verification, explicit confirmation, service stop/start, pre-restore preservation, and WAL/SHM cleanup.
+
+### Documentation
+
+* Added `SELF-HOSTING.md`.
+* Added `SECURITY-ENGINEERING-REPORT-v4.0.md`.
+* Added deployment asset documentation.
+* Updated the admin/security UI to identify the self-hosted SQLite architecture.
+* Updated the project README to make v4.0 the authoritative deployment model.
+
 ## 3.2.0 — Free Shared Persistence with Koyeb and Turso
 
 ### Database
