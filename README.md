@@ -10,7 +10,7 @@ I split application security and Hack The Box into separate repos so this one st
 |---|---|---|---|
 | Security architecture | [Private Data Logging Security Design Review](security-design-review/README.md) | Reviewed a logging architecture, identified two design risks, prioritized them, and proposed a schema validation layer plus central policy enforcement | Sanitized design review |
 | Threat modeling | [Online Banking Security Architecture](online-banking-threat-model/README.md) | Recreated a banking DFD in IriusRisk, reviewed threats, mapped controls, and documented STRIDE based risks | Threat assessment, security requirements, methodology notes |
-| Secure software | [Secure Lo Fi Study Cafe](secure-lofi-study-cafe/README.md) | Built a Node.js and Express app with SQLite, Socket.IO, authentication, RBAC, CSRF protection, rate limiting, audit logging, and moderated music controls | `server.js`, `database.js`, `schema.sql`, `package.json` |
+| Secure software | [Secure Lo Fi Study Cafe](secure-lofi-study-cafe/README.md) | Built a Node.js/Express/Socket.IO application with bcrypt authentication, session regeneration, RBAC, CSRF protection, secure uploads, indexed SQLite security telemetry, audit logging, forensic SQL, and an admin investigation console | `server.js`, `database.js`, `schema.sql`, `sql/security-forensics.sql`, v3.0 security report |
 | Static analysis | [C and C++ Static Analysis](cpp-static-analysis/README.md) | Ran Flawfinder against a C++ program, reviewed 31 findings, and separated tool warnings from actual risk | Sanitized Flawfinder summary |
 | Database team project | [Dating Application Database Team Project](dating-database-team-project/README.md) | Worked in a three person class team and served as the mock project manager while the group designed a database application | Project status and role documented; source is not public yet |
 | Python automation | [Nova Local Assistant](nova-local-assistant/README.md) | Built a local Python assistant with system diagnostics, research workflows, voice, Windows automation, and local model integration | Sanitized diagnostics source plus retained local versions |
@@ -65,4 +65,4 @@ Everything here is sanitized before it goes public.
 * No Hack The Box flags
 * No copied instructor source code
 
-When I do not have the original source anymore, I say that instead of rebuilding something and pretending it is the original.
+When original source is unavailable, the repository documents that limitation explicitly rather than presenting reconstructed material as retained source.
