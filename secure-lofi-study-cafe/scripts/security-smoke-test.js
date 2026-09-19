@@ -1,23 +1,17 @@
 "use strict";
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
-const testDatabasePath = path.join(
-  __dirname,
-  "..",
-  "security-smoke.db"
+const tempDir = fs.mkdtempSync(
+  path.join(os.tmpdir(), "secure-lofi-smoke-")
 );
 
-for (const suffix of ["", "-wal", "-shm"]) {
-  try {
-    fs.rmSync(testDatabasePath + suffix, { force: true });
-  } catch {}
-}
+const testDatabasePath = path.join(tempDir, "security-smoke.db");
 
-process.env.TURSO_DATABASE_URL = "file:security-smoke.db";
-delete process.env.TURSO_AUTH_TOKEN;
-delete process.env.NODE_ENV;
+process.env.DB_PATH = testDatabasePath;
+process.env.NODE_ENV = "test";
 
 const db = require("../database");
 
@@ -64,6 +58,19 @@ async function main() {
     }
   }
 
+  const journal = await db.get("PRAGMA journal_mode");
+  if (
+    !journal ||
+    String(journal.journal_mode || "").toLowerCase() !== "wal"
+  ) {
+    throw new Error("SQLite WAL mode is not enabled.");
+  }
+
+  const foreignKeys = await db.get("PRAGMA foreign_keys");
+  if (!foreignKeys || Number(foreignKeys.foreign_keys) !== 1) {
+    throw new Error("SQLite foreign-key enforcement is not enabled.");
+  }
+
   await db.run(
     `
     INSERT INTO sessions (sid, sess, expires_at)
@@ -88,9 +95,7 @@ async function main() {
   );
 
   if (!session || session.sid !== "smoke-session") {
-    throw new Error(
-      "Turso/libSQL session persistence verification failed."
-    );
+    throw new Error("SQLite session persistence verification failed.");
   }
 
   await db.run(
@@ -154,12 +159,19 @@ async function main() {
   );
 
   if (!queryPlan.length) {
-    throw new Error("libSQL query-plan verification failed.");
+    throw new Error("SQLite query-plan verification failed.");
   }
 
-  console.log("Security database smoke test passed.");
+  const integrity = await db.get("PRAGMA quick_check");
+  if (!integrity || integrity.quick_check !== "ok") {
+    throw new Error("SQLite quick_check did not return ok.");
+  }
+
+  await db.checkpoint("TRUNCATE");
+
+  console.log("Self-hosted SQLite security smoke test passed.");
   console.log(
-    `Verified ${requiredTables.size} tables and ${requiredIndexes.size} indexes using @libsql/client.`
+    `Verified ${requiredTables.size} tables, ${requiredIndexes.size} indexes, WAL mode, foreign keys, session persistence, and database integrity.`
   );
 }
 
@@ -168,17 +180,14 @@ async function cleanup() {
     await db.close();
   } catch {}
 
-  for (const suffix of ["", "-wal", "-shm"]) {
-    try {
-      fs.rmSync(testDatabasePath + suffix, { force: true });
-    } catch {}
-  }
+  fs.rmSync(tempDir, {
+    recursive: true,
+    force: true
+  });
 }
 
 main()
-  .then(async () => {
-    await cleanup();
-  })
+  .then(cleanup)
   .catch(async (err) => {
     console.error(err);
     await cleanup();
