@@ -203,6 +203,13 @@
     renderAvatars();
   }
 
+  function moveCurrentAvatarTo(x, y) {
+    const member = members[0];
+    member.avatarX = Math.min(92, Math.max(8, x));
+    member.avatarY = Math.min(92, Math.max(8, y));
+    renderAvatars();
+  }
+
   function setCurrentAvatarStyle(style) {
     const allowed = ["latte", "mocha", "matcha", "berry", "sky", "lavender"];
     if (!allowed.includes(style)) {
@@ -210,6 +217,14 @@
     }
 
     members[0].avatarStyle = style;
+
+    document.querySelectorAll("[data-avatar-style]").forEach((button) => {
+      button.setAttribute(
+        "aria-pressed",
+        button.dataset.avatarStyle === style ? "true" : "false"
+      );
+    });
+
     renderAvatars();
   }
 
@@ -643,6 +658,18 @@
 
 
   if (avatarStage) {
+    avatarStage.addEventListener("click", (event) => {
+      if (event.target.closest(".room-avatar")) {
+        return;
+      }
+
+      const bounds = avatarStage.getBoundingClientRect();
+      const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+      const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+      moveCurrentAvatarTo(x, y);
+      avatarStage.focus();
+    });
+
     avatarStage.addEventListener("keydown", (event) => {
       const moves = {
         ArrowUp: [0, -5],
