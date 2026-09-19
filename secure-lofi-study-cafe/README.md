@@ -1,18 +1,268 @@
-# Secure Lo Fi Study Cafe
+# Secure Lo-Fi Study Cafe
 
-> **Type:** Full stack secure web application  
+> **Release:** 3.0.0  
+> **Type:** Full-stack secure realtime web application  
 > **Stack:** Node.js, Express, SQLite, EJS, Socket.IO  
-> **Status:** Runnable full-stack app with a GitHub Pages UI demo
+> **Security focus:** authentication, sessions, RBAC, CSRF, parameterized SQL, structured security telemetry, audit logging, secure uploads, moderation, and incident reconstruction
 
-I built this as a study room app where people can sign in, chat, request music, and share a synchronized player. I also wanted the security controls to be part of the app itself instead of something I added at the end.
+## Live showcase
 
-## Live UI demo
+**Application UI:** https://andyspyro.github.io/Security-engineering-projects/secure-lofi-study-cafe/
 
-**GitHub Pages:** https://andyspyro.github.io/Security-engineering-projects/secure-lofi-study-cafe/
+**Cross-device showcase administrator**
 
-The Pages build is a safe static demonstration of the actual interface. GitHub Pages cannot run the Node.js server, SQLite database, sessions, or Socket.IO backend, so the security and real-time controls are demonstrated by the full application source below rather than faked as production security in the static preview.
+```text
+username: admin
+password: admin12345
+```
 
-## Run the full application locally
+The public GitHub Pages site is static. The built-in administrator above exists only so the same showcase login works across desktop and mobile browsers.
+
+Accounts created through the Pages registration form are browser-local because GitHub Pages does not run Node.js or SQLite.
+
+The full backend source in this directory implements the actual shared account database, bcrypt authentication, Express sessions, server-side authorization, Socket.IO, SQL security logging, and admin audit records.
+
+## Version 3.0 security engineering
+
+Version 3.0 adds a dedicated SQLite security telemetry pipeline alongside the existing application audit trail.
+
+### Structured SQL security events
+
+`security_events` records:
+
+* event UUID;
+* event type;
+* severity;
+* actor and username snapshot;
+* optional target user;
+* outcome;
+* HTTP method;
+* route;
+* request UUID;
+* keyed session correlation reference;
+* bounded metadata;
+* timestamp.
+
+Security telemetry covers:
+
+* registration;
+* login success and failure;
+* logout;
+* authentication rate-limit blocks;
+* CSRF failures;
+* unauthenticated protected-route access;
+* moderator/admin authorization denial;
+* HTTP request status and duration;
+* Socket.IO connect/disconnect;
+* profile-image acceptance and rejection.
+
+The table is indexed for time, type, actor, severity, and outcome.
+
+## Security controls
+
+| Control | Implementation |
+|---|---|
+| Password storage | bcrypt cost factor 12 |
+| Session fixation defense | session regeneration after successful login |
+| Session cookies | HttpOnly, SameSite=Lax, Secure in production, one-hour expiration |
+| Request correlation | random UUID returned as `X-Request-ID` |
+| Session correlation | HMAC-derived reference; raw session ID is not logged |
+| Authorization | server-side `requireLogin`, `requireModerator`, and `requirePermanentAdmin` |
+| CSRF | random session-bound token on state-changing HTTP actions |
+| Rate limiting | general limiter plus stricter authentication limiter |
+| SQL injection reduction | parameter placeholders for user-controlled database values |
+| XSS reduction | EJS escaping, `textContent`, Content Security Policy |
+| Security headers | Helmet with CSP |
+| Upload security | PNG/JPEG/WebP allowlist, 512 KB cap, binary signature validation |
+| Moderation evidence | soft-deleted messages retain author/deleter/timestamps |
+| Auditability | application `audit_logs` plus structured `security_events` |
+| CSV injection defense | spreadsheet formula prefixes neutralized before export |
+| Realtime security | Socket.IO tied to Express authenticated sessions |
+
+## Backend architecture
+
+```text
+Browser
+  |
+  +-- Express HTTP
+  |     +-- rate limiting
+  |     +-- session authentication
+  |     +-- request UUID
+  |     +-- CSRF validation
+  |     +-- RBAC
+  |     +-- validation
+  |     +-- parameterized SQL
+  |
+  +-- Socket.IO
+        +-- authenticated session
+        +-- chat
+        +-- presence
+        +-- avatar movement
+        +-- player synchronization
+        +-- voting
+
+                    |
+                    v
+                 SQLite
+        +-----------+-------------+
+        |           |             |
+    app tables   audit_logs   security_events
+                              + indexes
+                              + forensic queries
+```
+
+## Administrator console
+
+Permanent administrators have a separate `/admin` console while retaining all café functionality.
+
+The console includes:
+
+* user/account directory;
+* SQL security event stream;
+* severity and outcome;
+* actor/target attribution;
+* route and HTTP method;
+* request UUID;
+* non-secret session correlation reference;
+* structured metadata;
+* application audit trail;
+* chat-message history;
+* soft-deleted moderation evidence;
+* music request history;
+* CSV report export.
+
+The admin console does **not** expose plaintext passwords, password hashes, CSRF tokens, raw session cookies, browser history, precise location, or profile-image binary data in logs.
+
+## SQL forensics
+
+The repository includes [sql/security-forensics.sql](sql/security-forensics.sql).
+
+Queries cover:
+
+* high-severity events;
+* blocked/failed activity;
+* failed-login frequency;
+* authorization denials;
+* CSRF failures;
+* session correlation;
+* daily event summaries;
+* privileged actions;
+* deleted-message evidence;
+* account activity;
+* media moderation;
+* unified incident timelines;
+* index verification;
+* `EXPLAIN QUERY PLAN` inspection.
+
+## Security architecture page
+
+The application includes a dedicated Security Engineering page.
+
+In the full backend:
+
+```text
+/security
+```
+
+In the GitHub Pages build:
+
+```text
+secure-lofi-study-cafe/security.html
+```
+
+It presents the backend controls, SQL event model, forensic examples, and trust boundaries directly from the application interface.
+
+## Realtime café features
+
+* account registration/login;
+* live chat;
+* profanity filtering for normal users;
+* synchronized YouTube playback;
+* shared queue;
+* moderator approval;
+* vote-next;
+* temporary moderator/controller authority;
+* online presence;
+* profile pictures;
+* avatar customization;
+* smooth WASD/arrow/touch movement;
+* click/tap-to-walk;
+* avatar speech bubbles;
+* responsive mobile interface.
+
+Avatar positions are transient room state and are not persisted to the audit database.
+
+## Secure profile images
+
+The Node backend persists profile images with the user account.
+
+Accepted formats:
+
+* PNG;
+* JPEG;
+* WebP.
+
+Validation includes:
+
+* 512 KB decoded-size limit;
+* MIME allowlist;
+* binary file-signature validation;
+* authenticated upload event;
+* authenticated image-read route.
+
+SVG is rejected.
+
+Socket.IO presence packets carry a small profile-image URL/version instead of retransmitting base64 image data with every movement update.
+
+## Audit logging vs security telemetry
+
+Two SQL data sources serve different purposes.
+
+### `audit_logs`
+
+Application accountability:
+
+* message deletion;
+* chat submission;
+* moderation;
+* music approvals/rejections;
+* queue changes;
+* temporary privilege changes;
+* report downloads.
+
+### `security_events`
+
+Security detection and correlation:
+
+* authentication;
+* authorization;
+* CSRF;
+* rate limiting;
+* HTTP outcomes;
+* request IDs;
+* session references;
+* Socket.IO lifecycle;
+* upload validation.
+
+## CI validation
+
+GitHub Actions performs:
+
+* Node.js syntax checks;
+* EJS template compilation;
+* SQLite in-memory schema creation;
+* required-table verification;
+* required-index verification;
+* security-event insert/query verification;
+* SQLite query-plan generation.
+
+Run the database security test locally:
+
+```bash
+npm run test:security
+```
+
+## Run the full backend
 
 ```bash
 cd secure-lofi-study-cafe
@@ -20,128 +270,49 @@ npm install
 cp .env.example .env
 ```
 
-Replace the example `SESSION_SECRET` in `.env` with a long random value. One way to generate one is:
+Generate a session secret:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Then start the application:
+Set the generated value as `SESSION_SECRET`, then start:
 
 ```bash
 npm start
 ```
 
-Open `http://localhost:3000`.
-
-## What the app does
-
-* Account registration and login
-* Live chat
-* Shared music queue
-* Music requests with moderator approval
-* Synchronized YouTube playback
-* Vote to move to the next track
-* Temporary moderator and controller roles
-* Online member presence
-* Message deletion and moderation
-* Audit records for privileged actions
-
-## Security I built into it
-
-| Control | How I used it |
-|---|---|
-| Password storage | bcrypt hashes passwords before they are stored |
-| Sessions | Express sessions keep authenticated state on the server side |
-| Authorization | Privileged routes check roles on the server |
-| CSRF | State changing actions require a session token |
-| SQL safety | Queries use placeholders instead of joining user input into SQL |
-| Input validation | Registration, chat, titles, and media input have format or length checks |
-| XSS reduction | EJS escapes normal output and live chat uses `textContent` instead of trusted HTML |
-| Rate limiting | Authentication routes have tighter limits than normal traffic |
-| Security headers | Helmet sets browser security headers and a content security policy |
-| Auditability | Admin and moderation actions are written to the audit table |
-
-## One part I paid attention to
-
-The music request field can accept a YouTube URL, but I did not want the server to trust arbitrary iframe code.
-
-The backend extracts the video ID, checks the host and ID format, reads the optional starting time, and then rebuilds the media target from known values.
-
-That keeps the feature useful without accepting arbitrary embed markup.
-
-## Architecture
+Open:
 
 ```text
-Browser and EJS views
-        |
-        +--> HTTP forms and API routes
-        |
-        +--> Socket.IO events
-                 |
-                 v
-          Express application
-                 |
-        authentication
-        authorization
-        CSRF checks
-        validation
-                 |
-                 v
-              SQLite
-        users
-        messages
-        requests
-        queue
-        audit logs
+http://localhost:3000
 ```
 
-## Frontend restored in this repository
+The first account in a new local database is provisioned as the permanent administrator. Production deployment should replace bootstrap-first-admin behavior with an explicit administrative provisioning process.
 
-* [views/register.ejs](views/register.ejs) renders account registration.
-* [views/login.ejs](views/login.ejs) renders authentication.
-* [views/cafe.ejs](views/cafe.ejs) renders the live study-room dashboard.
-* [public/styles.css](public/styles.css) contains the responsive interface.
-* [public/cafe.js](public/cafe.js) handles Socket.IO state, chat, presence, queue updates, voting, and player synchronization.
-* [demo/](demo/) contains the static GitHub Pages preview.
+## Repository map
 
-## Backend proof in this folder
+| File | Purpose |
+|---|---|
+| [server.js](server.js) | HTTP routes, authentication, sessions, CSRF, RBAC, Socket.IO, security telemetry |
+| [database.js](database.js) | SQLite initialization, tables, migrations, indexes, query helpers |
+| [schema.sql](schema.sql) | documented relational/security schema |
+| [sql/security-forensics.sql](sql/security-forensics.sql) | investigation and incident-response SQL |
+| [views/admin.ejs](views/admin.ejs) | permanent-admin audit/security console |
+| [views/security.ejs](views/security.ejs) | backend security architecture interface |
+| [public/cafe.js](public/cafe.js) | realtime client behavior |
+| [public/style.css](public/style.css) | responsive café/security interface |
+| [scripts/security-smoke-test.js](scripts/security-smoke-test.js) | in-memory SQLite security validation |
+| [SECURITY-ENGINEERING-REPORT-v3.0.md](SECURITY-ENGINEERING-REPORT-v3.0.md) | full v3.0 engineering report |
+| [CHANGELOG.md](CHANGELOG.md) | release history |
+| [UI-UX-ENHANCEMENT-REPORT.md](UI-UX-ENHANCEMENT-REPORT.md) | interface, mobile, avatar, and accessibility design |
 
-* [server.js](server.js) contains the Express routes, sessions, authorization checks, CSRF checks, rate limiting, Socket.IO logic, and player controls.
-* [database.js](database.js) contains the SQLite setup and query helpers.
-* [schema.sql](schema.sql) shows the database schema in plain SQL.
-* [package.json](package.json) shows the main dependencies.
-* [FRONTEND.md](FRONTEND.md) documents the EJS, Socket.IO, and player behavior.
+## Reference guidance
 
-## Public safety
+Security decisions were cross-checked against:
 
-The working database and local environment file are not published. The public repo excludes user records, passwords, session data, and local secrets.
+* OWASP Logging Cheat Sheet
+* OWASP Session Management Cheat Sheet
+* OWASP File Upload Cheat Sheet
 
-For local development, the first registered account becomes an administrator. That bootstrap behavior is convenient for a private demo but should be replaced with an explicit administrator provisioning process before exposing the full Node.js application to untrusted public users.
-
-The GitHub Pages version is intentionally static and does not expose the backend database or authentication system.
-
-
-## Permanent admin audit console
-
-The permanent admin has an additional `/admin` console while retaining normal café access.
-
-The console includes:
-
-* User/account directory with roles and registration timestamps.
-* Structured audit events for registration, login/logout, chat, music requests, moderation, queue controls, controller/temp-admin changes, votes, and report exports.
-* Chat-message history with authorship and timestamps.
-* Soft-deleted moderated messages retained for accountability, including who performed the deletion.
-* Music request history and request status.
-* Search/filtering across admin-visible records.
-* Downloadable CSV audit report.
-* CSV formula-injection protection before user-controlled values are exported.
-
-Regular-user profanity is still censored in the live room. For moderation purposes, the original submitted chat text is retained in the permanent-admin audit trail. The registration and chat interfaces disclose that activity may be retained for moderation.
-
-The audit design intentionally avoids exposing passwords/password hashes, session cookies, CSRF tokens, precise location, browser history, or unrelated device-fingerprint data to the admin interface.
-
-
-## UI/UX redesign report
-
-The research, accessibility rationale, responsive/mobile decisions, animated coffee identity, and interactive avatar-room implementation are documented in [UI-UX-ENHANCEMENT-REPORT.md](UI-UX-ENHANCEMENT-REPORT.md).
+Full links and implementation mapping are documented in [SECURITY-ENGINEERING-REPORT-v3.0.md](SECURITY-ENGINEERING-REPORT-v3.0.md).
