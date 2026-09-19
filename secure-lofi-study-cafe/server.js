@@ -572,9 +572,11 @@ async function startQueueTrack(trackId, moderatorId, options = {}) {
     updatedAt: Date.now()
   };
 
-  await db.run(
-    "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-    [moderatorId, `Started queue track ID ${trackId}`]
+  await writeAudit(
+    moderatorId,
+    "player.track_start",
+    `Started queue track ID ${trackId}`,
+    { details: { trackId: Number(trackId), title: track.title } }
   );
 
   await resetVotesAndEmit();
@@ -622,9 +624,11 @@ async function startNextTrack(moderatorId, options = {}) {
       updatedAt: Date.now()
     };
 
-    await db.run(
-      "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-      [moderatorId, `Skipped to next queue track ID ${nextTrack.id}`]
+    await writeAudit(
+      moderatorId,
+      "player.track_next",
+      `Skipped to next queue track ID ${nextTrack.id}`,
+      { details: { trackId: nextTrack.id, title: nextTrack.title } }
     );
   } else {
     controllerState = {
@@ -638,9 +642,10 @@ async function startNextTrack(moderatorId, options = {}) {
       updatedAt: Date.now()
     };
 
-    await db.run(
-      "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-      [moderatorId, "Stopped player because queue was empty"]
+    await writeAudit(
+      moderatorId,
+      "player.stop",
+      "Stopped player because queue was empty"
     );
   }
 
@@ -1153,9 +1158,14 @@ app.post(
         [req.params.id]
       );
 
-      await db.run(
-        "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-        [req.session.user.id, `Approved music request ID ${req.params.id}`]
+      await writeAudit(
+        req.session.user.id,
+        "music.approve",
+        `Approved music request ID ${req.params.id}`,
+        {
+          targetUserId: request.user_id,
+          details: { requestId: Number(req.params.id), title: request.title }
+        }
       );
 
       const current = await db.get(
@@ -1190,9 +1200,22 @@ app.post(
         [req.params.id]
       );
 
-      await db.run(
-        "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-        [req.session.user.id, `Rejected music request ID ${req.params.id}`]
+      const rejectedRequest = await db.get(
+        "SELECT user_id, title FROM music_requests WHERE id = ?",
+        [req.params.id]
+      );
+
+      await writeAudit(
+        req.session.user.id,
+        "music.reject",
+        `Rejected music request ID ${req.params.id}`,
+        {
+          targetUserId: rejectedRequest ? rejectedRequest.user_id : null,
+          details: {
+            requestId: Number(req.params.id),
+            title: rejectedRequest ? rejectedRequest.title : null
+          }
+        }
       );
 
       await emitPendingRequests();
@@ -1253,9 +1276,11 @@ app.post(
         [req.params.id]
       );
 
-      await db.run(
-        "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-        [req.session.user.id, `Removed queue track ID ${req.params.id}`]
+      await writeAudit(
+        req.session.user.id,
+        "music.queue_remove",
+        `Removed queue track ID ${req.params.id}`,
+        { details: { trackId: Number(req.params.id) } }
       );
 
       await emitPlayerState();
@@ -1430,9 +1455,11 @@ app.post(
       controllerState.username = user.username;
       controllerState.updatedAt = Date.now();
 
-      await db.run(
-        "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-        [req.session.user.id, `Assigned temporary admin/controller to ${user.username}`]
+      await writeAudit(
+        req.session.user.id,
+        "admin.temp_grant",
+        `Assigned temporary admin/controller to ${user.username}`,
+        { targetUserId: user.id }
       );
 
       io.emit("room:system", {
@@ -1477,9 +1504,11 @@ app.post(
         controllerState.updatedAt = Date.now();
       }
 
-      await db.run(
-        "INSERT INTO audit_logs (user_id, action) VALUES (?, ?)",
-        [req.session.user.id, `Removed temporary admin/controller from ${user.username}`]
+      await writeAudit(
+        req.session.user.id,
+        "admin.temp_revoke",
+        `Removed temporary admin/controller from ${user.username}`,
+        { targetUserId: user.id }
       );
 
       io.emit("room:system", {
@@ -1667,6 +1696,12 @@ app.get(
   requirePermanentAdmin,
   async (req, res) => {
     try {
+      await writeAudit(
+        req.session.user.id,
+        "admin.report_export",
+        "Downloaded full CSV audit report"
+      );
+
       const records = [];
 
       const audits = await db.all(
@@ -1870,7 +1905,9 @@ io.on("connection", async (socket) => {
         {
           details: {
             messageId: result.lastID,
-            filteredForNonAdmin: user.role !== "admin"
+            filteredForNonAdmin: user.role !== "admin",
+            originalSubmittedText: rawMessage,
+            displayedText: storedMessage
           }
         }
       );
