@@ -2058,6 +2058,30 @@ app.get("/admin", requireLogin, requirePermanentAdmin, async (req, res) => {
       `
     );
 
+    const securityEvents = await db.all(
+      `
+      SELECT security_events.id,
+             security_events.event_uuid,
+             security_events.event_type,
+             security_events.severity,
+             security_events.username_snapshot,
+             security_events.outcome,
+             security_events.http_method,
+             security_events.route,
+             security_events.request_id,
+             security_events.session_ref,
+             security_events.metadata,
+             security_events.created_at,
+             actor.username AS actor_username,
+             target.username AS target_username
+      FROM security_events
+      LEFT JOIN users AS actor ON security_events.actor_user_id = actor.id
+      LEFT JOIN users AS target ON security_events.target_user_id = target.id
+      ORDER BY security_events.created_at DESC, security_events.id DESC
+      LIMIT 750
+      `
+    );
+
     const messageHistory = await db.all(
       `
       SELECT messages.id,
@@ -2100,12 +2124,20 @@ app.get("/admin", requireLogin, requirePermanentAdmin, async (req, res) => {
         "SELECT COUNT(*) AS count FROM messages WHERE deleted_at IS NOT NULL"
       ),
       auditEvents: await db.get("SELECT COUNT(*) AS count FROM audit_logs"),
+      securityEvents: await db.get("SELECT COUNT(*) AS count FROM security_events"),
+      highSecurityEvents: await db.get(
+        "SELECT COUNT(*) AS count FROM security_events WHERE severity = 'HIGH'"
+      ),
+      blockedSecurityEvents: await db.get(
+        "SELECT COUNT(*) AS count FROM security_events WHERE outcome IN ('blocked', 'failed')"
+      ),
       musicRequests: await db.get("SELECT COUNT(*) AS count FROM music_requests")
     };
 
     res.render("admin", {
       users,
       auditLogs,
+      securityEvents,
       messageHistory,
       musicRequests,
       counts: {
@@ -2114,6 +2146,9 @@ app.get("/admin", requireLogin, requirePermanentAdmin, async (req, res) => {
         activeMessages: counts.activeMessages.count,
         deletedMessages: counts.deletedMessages.count,
         auditEvents: counts.auditEvents.count,
+        securityEvents: counts.securityEvents.count,
+        highSecurityEvents: counts.highSecurityEvents.count,
+        blockedSecurityEvents: counts.blockedSecurityEvents.count,
         musicRequests: counts.musicRequests.count
       }
     });
@@ -2163,6 +2198,46 @@ app.get(
           action: row.action,
           content: row.details || "",
           status: "",
+          resourceId: row.id
+        });
+      }
+
+      const securityRows = await db.all(
+        `
+        SELECT security_events.id,
+               security_events.event_type,
+               security_events.severity,
+               security_events.username_snapshot,
+               security_events.outcome,
+               security_events.http_method,
+               security_events.route,
+               security_events.request_id,
+               security_events.session_ref,
+               security_events.metadata,
+               security_events.created_at,
+               actor.username AS actor_username,
+               target.username AS target_username
+        FROM security_events
+        LEFT JOIN users AS actor ON security_events.actor_user_id = actor.id
+        LEFT JOIN users AS target ON security_events.target_user_id = target.id
+        ORDER BY security_events.created_at ASC, security_events.id ASC
+        `
+      );
+
+      for (const row of securityRows) {
+        records.push({
+          timestamp: row.created_at,
+          category: "security",
+          eventType: row.event_type,
+          actor: row.actor_username || row.username_snapshot || "anonymous",
+          target: row.target_username || "",
+          action: `${row.severity} ${row.http_method || ""} ${row.route || ""}`.trim(),
+          content: JSON.stringify({
+            requestId: row.request_id,
+            sessionRef: row.session_ref,
+            metadata: row.metadata
+          }),
+          status: row.outcome,
           resourceId: row.id
         });
       }
