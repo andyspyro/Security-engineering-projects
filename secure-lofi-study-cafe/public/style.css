@@ -1116,12 +1116,13 @@ summary:focus-visible,
   display: grid;
   justify-items: center;
   transform: translate(-50%, -50%);
-  transition: left .18s ease, top .18s ease, transform .18s ease;
+  transition: left .12s linear, top .12s linear, transform .18s ease;
   filter: drop-shadow(0 7px 8px rgba(0,0,0,.32));
 }
 
 .room-avatar.is-you {
   z-index: 7;
+  transition: none;
 }
 
 .room-avatar.is-you .avatar-face {
