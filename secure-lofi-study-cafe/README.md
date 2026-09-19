@@ -120,3 +120,23 @@ The working database and local environment file are not published. The public re
 For local development, the first registered account becomes an administrator. That bootstrap behavior is convenient for a private demo but should be replaced with an explicit administrator provisioning process before exposing the full Node.js application to untrusted public users.
 
 The GitHub Pages version is intentionally static and does not expose the backend database or authentication system.
+
+
+## Permanent admin audit console
+
+The permanent admin has an additional `/admin` console while retaining normal café access.
+
+The console includes:
+
+* User/account directory with roles and registration timestamps.
+* Structured audit events for registration, login/logout, chat, music requests, moderation, queue controls, controller/temp-admin changes, votes, and report exports.
+* Chat-message history with authorship and timestamps.
+* Soft-deleted moderated messages retained for accountability, including who performed the deletion.
+* Music request history and request status.
+* Search/filtering across admin-visible records.
+* Downloadable CSV audit report.
+* CSV formula-injection protection before user-controlled values are exported.
+
+Regular-user profanity is still censored in the live room. For moderation purposes, the original submitted chat text is retained in the permanent-admin audit trail. The registration and chat interfaces disclose that activity may be retained for moderation.
+
+The audit design intentionally avoids exposing passwords/password hashes, session cookies, CSRF tokens, precise location, browser history, or unrelated device-fingerprint data to the admin interface.
