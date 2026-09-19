@@ -110,33 +110,11 @@
       role: session.role,
       controller: isAdmin,
       tempAdmin: false,
-      status: "Paused: 0:00 · Synced",
+      status: "Static preview · not connected to other browsers",
       avatarStyle: "latte",
-      avatarX: 36,
-      avatarY: 58,
+      avatarX: 50,
+      avatarY: 55,
       avatarImage: localStorage.getItem(PROFILE_IMAGE_KEY) || null
-    },
-    {
-      id: 2,
-      username: "Test",
-      role: "user",
-      controller: false,
-      tempAdmin: false,
-      status: "Paused: 0:00 · Independent",
-      avatarStyle: "lavender",
-      avatarX: 67,
-      avatarY: 36
-    },
-    {
-      id: 3,
-      username: "StudyBuddy",
-      role: "user",
-      controller: false,
-      tempAdmin: false,
-      status: "Online · Synced",
-      avatarStyle: "matcha",
-      avatarX: 73,
-      avatarY: 72
     }
   ];
 
