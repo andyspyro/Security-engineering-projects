@@ -185,6 +185,7 @@ function createApiRouter({
       `
       SELECT user_profiles.display_name,
              user_profiles.avatar_style,
+             user_profiles.availability_status,
              user_profiles.last_seen_at
       FROM user_profiles
       WHERE user_id = ?
@@ -617,12 +618,19 @@ function createApiRouter({
       SELECT messages.id,
              messages.room_id,
              messages.message_text,
+             messages.reply_to_message_id,
              messages.created_at,
              users.id AS user_id,
              users.username,
-             users.role AS user_role
+             users.role AS user_role,
+             reply.message_text AS reply_message_text,
+             reply_user.username AS reply_username
       FROM messages
       JOIN users ON users.id = messages.user_id
+      LEFT JOIN messages AS reply
+        ON reply.id = messages.reply_to_message_id
+      LEFT JOIN users AS reply_user
+        ON reply_user.id = reply.user_id
       WHERE messages.room_id = ?
         AND messages.deleted_at IS NULL
       ORDER BY messages.created_at DESC, messages.id DESC
@@ -631,7 +639,40 @@ function createApiRouter({
       [roomId]
     );
 
-    res.json({ messages: messages.reverse() });
+    const orderedMessages = messages.reverse();
+    const messageIds = orderedMessages.map((message) => message.id);
+
+    if (messageIds.length) {
+      const placeholders = messageIds.map(() => "?").join(",");
+      const reactions = await db.all(
+        `
+        SELECT message_id,
+               emoji,
+               COUNT(*) AS count
+        FROM message_reactions
+        WHERE message_id IN (${placeholders})
+        GROUP BY message_id, emoji
+        ORDER BY message_id ASC, emoji ASC
+        `,
+        messageIds
+      );
+
+      const byMessage = new Map();
+      for (const reaction of reactions) {
+        const list = byMessage.get(reaction.message_id) || [];
+        list.push({
+          emoji: reaction.emoji,
+          count: Number(reaction.count || 0)
+        });
+        byMessage.set(reaction.message_id, list);
+      }
+
+      for (const message of orderedMessages) {
+        message.reactions = byMessage.get(message.id) || [];
+      }
+    }
+
+    res.json({ messages: orderedMessages });
   });
 
   router.post(
@@ -674,9 +715,36 @@ function createApiRouter({
           ? rawMessage
           : censorBadWords(rawMessage);
 
+      let replyToMessageId = parsePositiveInt(req.body.replyToMessageId);
+
+      if (replyToMessageId) {
+        const replyTarget = await db.get(
+          `
+          SELECT id
+          FROM messages
+          WHERE id = ?
+            AND room_id = ?
+            AND deleted_at IS NULL
+          `,
+          [replyToMessageId, roomId]
+        );
+
+        if (!replyTarget) {
+          replyToMessageId = null;
+        }
+      }
+
       const result = await db.run(
-        "INSERT INTO messages (room_id, user_id, message_text) VALUES (?, ?, ?)",
-        [roomId, req.session.user.id, displayed]
+        `
+        INSERT INTO messages (
+          room_id,
+          user_id,
+          message_text,
+          reply_to_message_id
+        )
+        VALUES (?, ?, ?, ?)
+        `,
+        [roomId, req.session.user.id, displayed, replyToMessageId]
       );
 
       const saved = await db.get(
@@ -684,12 +752,19 @@ function createApiRouter({
         SELECT messages.id,
                messages.room_id,
                messages.message_text,
+               messages.reply_to_message_id,
                messages.created_at,
                users.id AS user_id,
                users.username,
-               users.role AS user_role
+               users.role AS user_role,
+               reply.message_text AS reply_message_text,
+               reply_user.username AS reply_username
         FROM messages
         JOIN users ON users.id = messages.user_id
+        LEFT JOIN messages AS reply
+          ON reply.id = messages.reply_to_message_id
+        LEFT JOIN users AS reply_user
+          ON reply_user.id = reply.user_id
         WHERE messages.id = ?
         `,
         [result.lastID]
