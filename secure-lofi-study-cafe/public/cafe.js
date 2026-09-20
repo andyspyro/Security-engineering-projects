@@ -1054,7 +1054,39 @@
   }
 
   function escapeRegExp(value) {
-    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\  function appendMessage(message, system = false) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function notifyMention(message) {
+    const text = String(message.message_text || "");
+    const mention = currentUsername
+      ? new RegExp("(^|\\s)@" + escapeRegExp(currentUsername) + "\\b", "i")
+      : null;
+
+    if (!mention || !mention.test(text)) {
+      return;
+    }
+
+    const node = chatLog.querySelector(
+      "[data-message-id=\"" + String(message.id) + "\"]"
+    );
+    node?.classList.add("message-mentioned");
+    showToast(message.username + " mentioned you.", "success");
+
+    if (
+      notificationPreference &&
+      notificationPreference.checked &&
+      document.hidden &&
+      "Notification" in window &&
+      Notification.permission === "granted"
+    ) {
+      new Notification("Mention from " + message.username, {
+        body: text.slice(0, 140)
+      });
+    }
+  }
+
+  function appendMessage(message, system = false) {
     const messageId =
       !system && message && message.id
         ? String(message.id)
@@ -1086,61 +1118,45 @@
       if (message.reply_to_message_id && message.reply_message_text) {
         const replyPreview = document.createElement("div");
         replyPreview.className = "reply-preview";
-
         const replyName = document.createElement("strong");
         replyName.textContent =
           "Replying to " + (message.reply_username || "message");
-
         const replyText = document.createElement("span");
         replyText.textContent = message.reply_message_text;
-
         replyPreview.append(replyName, replyText);
         article.appendChild(replyPreview);
       }
 
       const meta = document.createElement("div");
       meta.className = "message-meta";
-
       const authorWrap = document.createElement("div");
       authorWrap.className = "message-author";
-
       const avatar = document.createElement("span");
       avatar.className = "message-avatar";
       avatar.textContent = String(message.username || "?").slice(0, 1).toUpperCase();
-
       const author = document.createElement("strong");
       author.textContent = message.username;
-
       authorWrap.append(avatar, author);
-
       const time = document.createElement("span");
-      time.textContent = new Date(
-        message.created_at || Date.now()
-      ).toLocaleString();
-
+      time.textContent = new Date(message.created_at || Date.now()).toLocaleString();
       const text = document.createElement("p");
       text.className = "message-text";
       text.textContent = message.message_text;
-
       meta.append(authorWrap, time);
       article.append(meta, text);
 
       const reactionSummary = document.createElement("div");
       reactionSummary.className = "message-reactions";
       reactionSummary.dataset.reactionsFor = messageId;
-
       const inlineActions = document.createElement("div");
       inlineActions.className = "message-inline-actions";
-
       const replyButton = document.createElement("button");
       replyButton.type = "button";
       replyButton.className = "message-reply-button";
       replyButton.dataset.replyMessage = messageId;
       replyButton.textContent = "Reply";
-
       const picker = document.createElement("div");
       picker.className = "reaction-picker";
-
       ["☕", "💜", "👍", "✨", "😂"].forEach((emojiValue) => {
         const reactionButton = document.createElement("button");
         reactionButton.type = "button";
@@ -1150,36 +1166,30 @@
         reactionButton.textContent = emojiValue;
         picker.appendChild(reactionButton);
       });
-
       inlineActions.append(replyButton, picker);
       article.append(reactionSummary, inlineActions);
 
       if (canModerate && message.id) {
         const menu = document.createElement("details");
         menu.className = "message-action-menu";
-
         const summary = document.createElement("summary");
         summary.setAttribute("aria-label", "Message actions");
         summary.textContent = "•••";
-
         const form = actionForm(
           "/admin/messages/" + message.id + "/delete",
           "Delete message",
           "danger"
         );
         form.className = "inline-form";
-
         menu.append(summary, form);
         article.appendChild(menu);
       }
     }
 
     chatLog.appendChild(article);
-
     if (messageId && message.reactions) {
       renderReactionSummary(messageId, message.reactions);
     }
-
     chatLog.scrollTop = chatLog.scrollHeight;
   }
   function estimatedControllerSeconds() {
