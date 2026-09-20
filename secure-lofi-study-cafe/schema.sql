@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     user_id INTEGER PRIMARY KEY,
     display_name TEXT,
     avatar_style TEXT NOT NULL DEFAULT 'latte',
+    availability_status TEXT NOT NULL DEFAULT 'studying',
     last_seen_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
