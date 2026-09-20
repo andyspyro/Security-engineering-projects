@@ -20,6 +20,7 @@
   const chatForm = document.getElementById("chat-form");
   const chatInput = document.getElementById("chat-input");
   const socketStatus = document.getElementById("socket-status");
+  const latencyStatus = document.getElementById("latency-status");
   const queueList = document.getElementById("queue-list");
   const historyList = document.getElementById("history-list");
   const membersList = document.getElementById("members-list");
@@ -1152,6 +1153,11 @@
   socket.on("disconnect", () => {
     socketStatus.textContent = "Reconnecting";
     socketStatus.classList.remove("live");
+
+    if (latencyStatus) {
+      latencyStatus.textContent = "Latency —";
+      latencyStatus.classList.remove("live");
+    }
   });
 
   socket.on("connect_error", (error) => {
@@ -1236,6 +1242,32 @@
     followingRoom = true;
     applyPlayerState(state, true);
   });
+
+  setInterval(() => {
+    if (!socket.connected || !latencyStatus) {
+      return;
+    }
+
+    const started = performance.now();
+
+    socket
+      .timeout(3000)
+      .emit("client:ping", (error) => {
+        if (error) {
+          latencyStatus.textContent = "Latency timeout";
+          latencyStatus.classList.remove("live");
+          return;
+        }
+
+        const roundTrip = Math.max(
+          0,
+          Math.round(performance.now() - started)
+        );
+
+        latencyStatus.textContent = `Latency ${roundTrip} ms`;
+        latencyStatus.classList.toggle("live", roundTrip < 180);
+      });
+  }, 5000);
 
   setInterval(() => {
     if (!player || !youtubeReady) {
