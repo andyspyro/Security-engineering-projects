@@ -41,6 +41,11 @@
   const profileImageInput = document.getElementById("profile-image-input");
   const removeProfileImageButton = document.getElementById("remove-profile-image");
   const profileImageStatus = document.getElementById("profile-image-status");
+  const availabilityStatus = document.getElementById("availability-status");
+  const availabilityStatusNote = document.getElementById("availability-status-note");
+  const memberProfileDialog = document.getElementById("member-profile-dialog");
+  const memberProfileContent = document.getElementById("member-profile-content");
+  const toastRegion = document.getElementById("toast-region");
 
   let latestMembers = [];
   let player = null;
@@ -55,12 +60,15 @@
     ).map((node) => String(node.dataset.messageId))
   );
   const speechBubbles = new Map();
+  const remoteAvatarTargets = new Map();
   const heldKeys = new Set();
   let heldPointerVector = null;
   let movementTarget = null;
   let movementFrame = null;
   let lastMovementTime = 0;
   let lastMovementEmit = 0;
+  let remoteInterpolationFrame = null;
+  let remoteInterpolationTime = 0;
   let isWalking = false;
 
   const WALK_SPEED = 24;
@@ -178,6 +186,116 @@
   }
 
 
+  const AVAILABILITY_LABELS = {
+    studying: "Studying",
+    chat: "Available to chat",
+    dnd: "Do not disturb",
+    afk: "AFK"
+  };
+
+  function availabilityLabel(value) {
+    return AVAILABILITY_LABELS[value] || AVAILABILITY_LABELS.studying;
+  }
+
+  function showToast(message, tone = "info") {
+    if (!toastRegion) {
+      return;
+    }
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${tone}`;
+    toast.textContent = String(message || "").slice(0, 220);
+    toastRegion.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.classList.add("is-visible");
+    });
+
+    setTimeout(() => {
+      toast.classList.remove("is-visible");
+      setTimeout(() => toast.remove(), 180);
+    }, 3200);
+  }
+
+  function openMemberProfile(member) {
+    if (!member || !memberProfileDialog || !memberProfileContent) {
+      return;
+    }
+
+    memberProfileContent.replaceChildren();
+
+    const header = document.createElement("div");
+    header.className = "member-profile-header";
+
+    const visual = document.createElement("span");
+    visual.className = `member-profile-avatar avatar-${member.avatarStyle || "latte"}`;
+    if (member.avatarImageUrl) {
+      const image = document.createElement("img");
+      image.src = member.avatarImageUrl;
+      image.alt = "";
+      visual.appendChild(image);
+    } else {
+      visual.textContent = avatarGlyph(member.avatarStyle || "latte");
+    }
+
+    const heading = document.createElement("div");
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "eyebrow";
+    eyebrow.textContent = member.online === false ? "Room member" : "Online now";
+
+    const title = document.createElement("h2");
+    title.textContent = member.username;
+
+    const status = document.createElement("p");
+    status.className = "member-profile-status";
+    status.textContent = availabilityLabel(member.availabilityStatus);
+
+    heading.append(eyebrow, title, status);
+    header.append(visual, heading);
+
+    const facts = document.createElement("dl");
+    facts.className = "profile-facts";
+
+    const entries = [
+      ["Role", member.role || "user"],
+      ["Presence", member.online === false ? "Offline" : "Online"],
+      ["Room", member.roomId ? `Main Study Café · #${member.roomId}` : "Main Study Café"],
+      ["Connections", String(member.connectionCount || 1)],
+      ["Listening", member.playbackStatus || "Online"],
+      ["Music mode", member.followingRoom === false ? "Independent" : "Synced"],
+      ["Last seen", member.lastSeenAt ? new Date(member.lastSeenAt).toLocaleString() : "Now"]
+    ];
+
+    if (member.isController) {
+      entries.push(["Room role", "Controller / DJ"]);
+    } else if (member.isTempAdmin) {
+      entries.push(["Room role", "Temporary moderator"]);
+    }
+
+    entries.forEach(([label, value]) => {
+      const row = document.createElement("div");
+      const dt = document.createElement("dt");
+      const dd = document.createElement("dd");
+      dt.textContent = label;
+      dd.textContent = value;
+      row.append(dt, dd);
+      facts.appendChild(row);
+    });
+
+    const privacy = document.createElement("p");
+    privacy.className = "compact profile-privacy";
+    privacy.textContent =
+      "This profile shows room-safe information only. Administrative telemetry is not exposed here.";
+
+    memberProfileContent.append(header, facts, privacy);
+
+    if (typeof memberProfileDialog.showModal === "function") {
+      memberProfileDialog.showModal();
+    } else {
+      memberProfileDialog.setAttribute("open", "");
+    }
+  }
+
   function avatarGlyph(style) {
     const glyphs = {
       latte: "☕",
@@ -268,8 +386,17 @@
       );
 
       if (!avatar) {
-        avatar = document.createElement("div");
+        avatar = document.createElement("button");
+        avatar.type = "button";
         avatar.dataset.userId = memberId;
+        avatar.className = "room-avatar";
+        avatar.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const selected = latestMembers.find(
+            (candidate) => Number(candidate.id) === Number(avatar.dataset.userId)
+          );
+          openMemberProfile(selected);
+        });
 
         const face = document.createElement("span");
         face.className = "avatar-face";
@@ -286,8 +413,21 @@
 
       avatar.className =
         `room-avatar avatar-${style}${isCurrent ? " is-you" : ""}${isCurrent && isWalking ? " is-walking" : ""}`;
-      avatar.style.left = `${Number(member.avatarX || 50)}%`;
-      avatar.style.top = `${Number(member.avatarY || 50)}%`;
+      const snapshotX = Number(member.avatarX || 50);
+      const snapshotY = Number(member.avatarY || 50);
+
+      if (isCurrent || !avatar.dataset.renderX) {
+        avatar.dataset.renderX = String(snapshotX);
+        avatar.dataset.renderY = String(snapshotY);
+        avatar.style.left = `${snapshotX}%`;
+        avatar.style.top = `${snapshotY}%`;
+      } else if (!remoteAvatarTargets.has(Number(member.id))) {
+        remoteAvatarTargets.set(Number(member.id), {
+          x: snapshotX,
+          y: snapshotY
+        });
+        ensureRemoteInterpolation();
+      }
       avatar.setAttribute(
         "aria-label",
         `${member.username}${isCurrent ? ", your avatar" : ""}`
@@ -324,6 +464,82 @@
     });
   }
 
+  function ensureRemoteInterpolation() {
+    if (remoteInterpolationFrame) {
+      return;
+    }
+
+    remoteInterpolationTime = 0;
+    remoteInterpolationFrame = requestAnimationFrame(stepRemoteInterpolation);
+  }
+
+  function stepRemoteInterpolation(now) {
+    if (!remoteInterpolationTime) {
+      remoteInterpolationTime = now;
+    }
+
+    const deltaSeconds = Math.min(
+      0.05,
+      Math.max(0.001, (now - remoteInterpolationTime) / 1000)
+    );
+    remoteInterpolationTime = now;
+
+    let hasWork = false;
+
+    for (const [memberId, target] of remoteAvatarTargets.entries()) {
+      const avatar = avatarLayer
+        ? avatarLayer.querySelector(
+            `[data-user-id="${String(memberId)}"]`
+          )
+        : null;
+
+      if (!avatar) {
+        remoteAvatarTargets.delete(memberId);
+        continue;
+      }
+
+      const currentX = Number(
+        avatar.dataset.renderX || parseFloat(avatar.style.left) || target.x
+      );
+      const currentY = Number(
+        avatar.dataset.renderY || parseFloat(avatar.style.top) || target.y
+      );
+
+      const smoothing = 1 - Math.exp(-14 * deltaSeconds);
+      const nextX = currentX + (target.x - currentX) * smoothing;
+      const nextY = currentY + (target.y - currentY) * smoothing;
+
+      avatar.dataset.renderX = String(nextX);
+      avatar.dataset.renderY = String(nextY);
+      avatar.style.left = `${nextX}%`;
+      avatar.style.top = `${nextY}%`;
+      avatar.classList.add("is-network-moving");
+
+      const settled =
+        Math.abs(target.x - nextX) < 0.04 &&
+        Math.abs(target.y - nextY) < 0.04;
+
+      if (settled) {
+        avatar.dataset.renderX = String(target.x);
+        avatar.dataset.renderY = String(target.y);
+        avatar.style.left = `${target.x}%`;
+        avatar.style.top = `${target.y}%`;
+        avatar.classList.remove("is-network-moving");
+        remoteAvatarTargets.delete(memberId);
+      } else {
+        hasWork = true;
+      }
+    }
+
+    if (hasWork || remoteAvatarTargets.size) {
+      remoteInterpolationFrame = requestAnimationFrame(stepRemoteInterpolation);
+      return;
+    }
+
+    remoteInterpolationFrame = null;
+    remoteInterpolationTime = 0;
+  }
+
   function applyRemoteAvatarMove(payload) {
     if (!payload || Number(payload.userId) === currentUserId) {
       return;
@@ -346,23 +562,8 @@
 
     member.avatarX = x;
     member.avatarY = y;
-
-    const avatar = avatarLayer
-      ? avatarLayer.querySelector(
-          `[data-user-id="${String(payload.userId)}"]`
-        )
-      : null;
-
-    if (avatar) {
-      avatar.style.left = `${x}%`;
-      avatar.style.top = `${y}%`;
-      avatar.classList.add("is-network-moving");
-
-      clearTimeout(avatar._networkMoveTimer);
-      avatar._networkMoveTimer = setTimeout(() => {
-        avatar.classList.remove("is-network-moving");
-      }, 140);
-    }
+    remoteAvatarTargets.set(Number(payload.userId), { x, y });
+    ensureRemoteInterpolation();
   }
 
   function setSpeechBubble(username, message) {
@@ -568,6 +769,11 @@
     membersList.replaceChildren();
     renderAvatars(members);
 
+    const self = currentMember();
+    if (self && availabilityStatus) {
+      availabilityStatus.value = self.availabilityStatus || "studying";
+    }
+
     if (memberCount) {
       memberCount.textContent = `${members.length} online`;
     }
@@ -582,8 +788,10 @@
     }
 
     members.forEach((member) => {
-      const item = document.createElement("div");
+      const item = document.createElement("button");
+      item.type = "button";
       item.className = "member-card";
+      item.addEventListener("click", () => openMemberProfile(member));
 
       const identity = document.createElement("div");
       identity.className = "member-identity";
@@ -617,7 +825,8 @@
         : "";
       const mode = member.followingRoom ? "Synced" : "Independent";
 
-      status.textContent = `${playback}${track} · ${mode}`;
+      status.textContent =
+        `${availabilityLabel(member.availabilityStatus)} · ${playback}${track} · ${mode}`;
 
       left.append(name, status);
       identity.append(thumb, left);
@@ -635,15 +844,6 @@
 
       if (member.isTempAdmin && member.role !== "admin") {
         right.appendChild(roleBadge("temp admin", "admin"));
-      }
-
-      if (canAssign && member.id !== currentUserId) {
-        right.appendChild(
-          actionForm(
-            `/admin/members/${member.id}/${member.isTempAdmin ? "remove-temp-admin" : "temp-admin"}`,
-            member.isTempAdmin ? "Remove Temp Admin" : "Make Temp Admin"
-          )
-        );
       }
 
       item.append(identity, right);
@@ -727,13 +927,22 @@
       article.append(meta, text);
 
       if (canModerate && message.id) {
+        const menu = document.createElement("details");
+        menu.className = "message-action-menu";
+
+        const summary = document.createElement("summary");
+        summary.setAttribute("aria-label", "Message actions");
+        summary.textContent = "•••";
+
         const form = actionForm(
           `/admin/messages/${message.id}/delete`,
-          "Delete",
+          "Delete message",
           "danger"
         );
         form.className = "inline-form";
-        article.appendChild(form);
+
+        menu.append(summary, form);
+        article.appendChild(menu);
       }
     }
 
@@ -966,6 +1175,42 @@
     });
   });
 
+  if (availabilityStatus) {
+    availabilityStatus.addEventListener("change", () => {
+      const status = availabilityStatus.value;
+
+      availabilityStatus.disabled = true;
+      socket.emit(
+        "member:availability",
+        {
+          status,
+          csrfToken
+        },
+        (response) => {
+          availabilityStatus.disabled = false;
+
+          if (!response || !response.ok) {
+            showToast(
+              (response && response.error) || "Could not update room status.",
+              "error"
+            );
+            return;
+          }
+
+          if (availabilityStatusNote) {
+            availabilityStatusNote.textContent =
+              `Status updated: ${availabilityLabel(response.status)}.`;
+          }
+
+          showToast(
+            `Status: ${availabilityLabel(response.status)}`,
+            "success"
+          );
+        }
+      );
+    });
+  }
+
   if (profileImageInput) {
     profileImageInput.addEventListener("change", () => {
       const file = profileImageInput.files && profileImageInput.files[0];
@@ -1150,6 +1395,7 @@
 
   socket.on("connect", () => {
     socketStatus.textContent = "Syncing";
+    showToast("Connected. Synchronizing room state…", "success");
     socketStatus.classList.remove("live");
     loadInitialRoomMembers();
     loadInitialRoomMessages();
@@ -1158,6 +1404,7 @@
 
   socket.on("disconnect", () => {
     socketStatus.textContent = "Reconnecting";
+    showToast("Connection lost. Reconnecting automatically…", "warning");
     socketStatus.classList.remove("live");
 
     if (latencyStatus) {
