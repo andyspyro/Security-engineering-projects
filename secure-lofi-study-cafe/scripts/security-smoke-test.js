@@ -19,13 +19,20 @@ async function main() {
   await db.ready;
 
   const requiredTables = new Set([
+    "roles",
+    "permissions",
+    "role_permissions",
     "users",
+    "user_profiles",
+    "rooms",
+    "room_memberships",
     "messages",
     "music_requests",
     "music_queue",
+    "sessions",
+    "presence_sessions",
     "audit_logs",
-    "security_events",
-    "sessions"
+    "security_events"
   ]);
 
   const tables = await db.all(
@@ -39,13 +46,17 @@ async function main() {
   }
 
   const requiredIndexes = new Set([
+    "idx_sessions_expires_at",
+    "idx_presence_room_status",
+    "idx_presence_user_status",
+    "idx_room_memberships_user",
+    "idx_messages_room_created",
     "idx_security_events_created_at",
     "idx_security_events_type",
     "idx_security_events_actor",
     "idx_security_events_severity_outcome",
     "idx_audit_logs_created_at",
-    "idx_messages_user_created",
-    "idx_sessions_expires_at"
+    "idx_messages_user_created"
   ]);
 
   const indexes = await db.all(
@@ -69,6 +80,41 @@ async function main() {
   const foreignKeys = await db.get("PRAGMA foreign_keys");
   if (!foreignKeys || Number(foreignKeys.foreign_keys) !== 1) {
     throw new Error("SQLite foreign-key enforcement is not enabled.");
+  }
+
+  const defaultRoom = await db.get(
+    "SELECT id, slug, name FROM rooms WHERE id = ?",
+    [1]
+  );
+
+  if (
+    !defaultRoom ||
+    defaultRoom.slug !== "main" ||
+    !defaultRoom.name
+  ) {
+    throw new Error("Default room was not initialized.");
+  }
+
+  const adminPermission = await db.get(
+    `
+    SELECT 1 AS allowed
+    FROM role_permissions
+    WHERE role_name = 'admin'
+      AND permission_name = 'admin.console'
+    `
+  );
+
+  const userPermission = await db.get(
+    `
+    SELECT 1 AS allowed
+    FROM role_permissions
+    WHERE role_name = 'user'
+      AND permission_name = 'room.use'
+    `
+  );
+
+  if (!adminPermission || !userPermission) {
+    throw new Error("Role/permission seed data is incomplete.");
   }
 
   await db.run(
@@ -171,7 +217,7 @@ async function main() {
 
   console.log("Self-hosted SQLite security smoke test passed.");
   console.log(
-    `Verified ${requiredTables.size} tables, ${requiredIndexes.size} indexes, WAL mode, foreign keys, session persistence, and database integrity.`
+    `Verified ${requiredTables.size} tables, ${requiredIndexes.size} indexes, RBAC seed data, room schema, WAL mode, foreign keys, session persistence, and database integrity.`
   );
 }
 
