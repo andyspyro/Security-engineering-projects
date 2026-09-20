@@ -2436,17 +2436,105 @@ app.post(
 
 app.get("/admin", requireLogin, requirePermanentAdmin, async (req, res) => {
   try {
+    const activeMembers = getMembersList();
+    const liveByUserId = new Map(
+      activeMembers.map((member) => [Number(member.id), member])
+    );
+
     const users = await db.all(
       `
       SELECT users.id,
              users.username,
              users.role,
              users.created_at,
-             COUNT(messages.id) AS message_count
+             user_profiles.last_seen_at,
+             COUNT(messages.id) AS message_count,
+             (
+               SELECT security_events.client_ip
+               FROM security_events
+               WHERE security_events.actor_user_id = users.id
+                 AND security_events.client_ip IS NOT NULL
+               ORDER BY security_events.id DESC
+               LIMIT 1
+             ) AS latest_ip,
+             (
+               SELECT security_events.user_agent
+               FROM security_events
+               WHERE security_events.actor_user_id = users.id
+                 AND security_events.user_agent IS NOT NULL
+               ORDER BY security_events.id DESC
+               LIMIT 1
+             ) AS latest_user_agent
       FROM users
+      LEFT JOIN user_profiles ON user_profiles.user_id = users.id
       LEFT JOIN messages ON messages.user_id = users.id
       GROUP BY users.id
       ORDER BY users.created_at ASC
+      `
+    );
+
+    for (const account of users) {
+      const live = liveByUserId.get(Number(account.id));
+      account.online = Boolean(live);
+      account.connection_count = live ? Number(live.connectionCount || 0) : 0;
+      account.room_id = live ? Number(live.roomId || DEFAULT_ROOM_ID) : null;
+      if (live && live.lastSeenAt) {
+        account.last_seen_at = live.lastSeenAt;
+      }
+    }
+
+    const rawSessions = await db.all(
+      `
+      SELECT sid, sess, expires_at, updated_at
+      FROM sessions
+      WHERE expires_at > ?
+      ORDER BY updated_at DESC
+      LIMIT 200
+      `,
+      [Date.now()]
+    );
+
+    const activeSessions = rawSessions
+      .map((row) => {
+        try {
+          const parsed = JSON.parse(row.sess);
+          const sessionUser = parsed && parsed.user;
+
+          if (!sessionUser || !sessionUser.id) {
+            return null;
+          }
+
+          return {
+            sessionRef: makeSessionRef(row.sid),
+            userId: Number(sessionUser.id),
+            username: String(sessionUser.username || "unknown"),
+            role: String(sessionUser.role || "unknown"),
+            expiresAt: Number(row.expires_at),
+            updatedAt: row.updated_at
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    const presenceHistory = await db.all(
+      `
+      SELECT presence_sessions.id,
+             presence_sessions.socket_ref,
+             presence_sessions.status,
+             presence_sessions.connected_at,
+             presence_sessions.last_seen_at,
+             presence_sessions.disconnected_at,
+             users.id AS user_id,
+             users.username,
+             users.role,
+             rooms.name AS room_name
+      FROM presence_sessions
+      JOIN users ON users.id = presence_sessions.user_id
+      JOIN rooms ON rooms.id = presence_sessions.room_id
+      ORDER BY presence_sessions.connected_at DESC
+      LIMIT 150
       `
     );
 
@@ -2479,6 +2567,8 @@ app.get("/admin", requireLogin, requirePermanentAdmin, async (req, res) => {
              security_events.route,
              security_events.request_id,
              security_events.session_ref,
+             security_events.client_ip,
+             security_events.user_agent,
              security_events.metadata,
              security_events.created_at,
              actor.username AS actor_username,
@@ -2523,49 +2613,201 @@ app.get("/admin", requireLogin, requirePermanentAdmin, async (req, res) => {
       `
     );
 
+    const [
+      messagesCount,
+      activeMessagesCount,
+      deletedMessagesCount,
+      auditEventsCount,
+      securityEventsCount,
+      highSecurityEventsCount,
+      blockedSecurityEventsCount,
+      musicRequestsCount,
+      failedLogins24h,
+      journalMode
+    ] = await Promise.all([
+      db.get("SELECT COUNT(*) AS count FROM messages"),
+      db.get("SELECT COUNT(*) AS count FROM messages WHERE deleted_at IS NULL"),
+      db.get("SELECT COUNT(*) AS count FROM messages WHERE deleted_at IS NOT NULL"),
+      db.get("SELECT COUNT(*) AS count FROM audit_logs"),
+      db.get("SELECT COUNT(*) AS count FROM security_events"),
+      db.get("SELECT COUNT(*) AS count FROM security_events WHERE severity = 'HIGH'"),
+      db.get("SELECT COUNT(*) AS count FROM security_events WHERE outcome IN ('blocked', 'failed')"),
+      db.get("SELECT COUNT(*) AS count FROM music_requests"),
+      db.get(
+        `
+        SELECT COUNT(*) AS count
+        FROM security_events
+        WHERE event_type IN ('auth.login_failed', 'auth.api_login_failed')
+          AND created_at >= datetime('now', '-24 hours')
+        `
+      ),
+      db.get("PRAGMA journal_mode")
+    ]);
+
     const counts = {
       users: users.length,
-      messages: await db.get("SELECT COUNT(*) AS count FROM messages"),
-      activeMessages: await db.get(
-        "SELECT COUNT(*) AS count FROM messages WHERE deleted_at IS NULL"
+      onlineUsers: activeMembers.length,
+      activeSockets: activeMembers.reduce(
+        (total, member) => total + Number(member.connectionCount || 0),
+        0
       ),
-      deletedMessages: await db.get(
-        "SELECT COUNT(*) AS count FROM messages WHERE deleted_at IS NOT NULL"
-      ),
-      auditEvents: await db.get("SELECT COUNT(*) AS count FROM audit_logs"),
-      securityEvents: await db.get("SELECT COUNT(*) AS count FROM security_events"),
-      highSecurityEvents: await db.get(
-        "SELECT COUNT(*) AS count FROM security_events WHERE severity = 'HIGH'"
-      ),
-      blockedSecurityEvents: await db.get(
-        "SELECT COUNT(*) AS count FROM security_events WHERE outcome IN ('blocked', 'failed')"
-      ),
-      musicRequests: await db.get("SELECT COUNT(*) AS count FROM music_requests")
+      activeSessions: activeSessions.length,
+      failedLogins24h: Number(failedLogins24h.count || 0),
+      messages: Number(messagesCount.count || 0),
+      activeMessages: Number(activeMessagesCount.count || 0),
+      deletedMessages: Number(deletedMessagesCount.count || 0),
+      auditEvents: Number(auditEventsCount.count || 0),
+      securityEvents: Number(securityEventsCount.count || 0),
+      highSecurityEvents: Number(highSecurityEventsCount.count || 0),
+      blockedSecurityEvents: Number(blockedSecurityEventsCount.count || 0),
+      musicRequests: Number(musicRequestsCount.count || 0)
+    };
+
+    const runtime = {
+      uptimeSeconds: Math.floor(process.uptime()),
+      nodeVersion: process.version,
+      pid: process.pid,
+      rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      databasePath: db.path,
+      journalMode: journalMode ? journalMode.journal_mode : "unknown",
+      host: HOST,
+      port: PORT,
+      trustProxy: TRUST_PROXY,
+      publicOrigin: process.env.PUBLIC_ORIGIN || "(same-origin / not pinned)"
+    };
+
+    const requestContext = {
+      clientIp: getRequestClientIp(req) || "unavailable",
+      userAgent: normalizeUserAgent(req.get("user-agent")) || "unavailable",
+      sessionRef: makeSessionRef(req.sessionID) || "unavailable",
+      cookie: {
+        name: "lofi.sid",
+        httpOnly: true,
+        secure: COOKIE_SECURE,
+        sameSite: "Lax",
+        maxAgeMinutes: 60,
+        expiresAt: req.session.cookie.expires
+          ? new Date(req.session.cookie.expires).toISOString()
+          : null
+      }
     };
 
     res.render("admin", {
       users,
+      activeMembers,
+      activeSessions,
+      presenceHistory,
       auditLogs,
       securityEvents,
       messageHistory,
       musicRequests,
-      counts: {
-        users: counts.users,
-        messages: counts.messages.count,
-        activeMessages: counts.activeMessages.count,
-        deletedMessages: counts.deletedMessages.count,
-        auditEvents: counts.auditEvents.count,
-        securityEvents: counts.securityEvents.count,
-        highSecurityEvents: counts.highSecurityEvents.count,
-        blockedSecurityEvents: counts.blockedSecurityEvents.count,
-        musicRequests: counts.musicRequests.count
-      }
+      counts,
+      runtime,
+      requestContext
     });
   } catch (err) {
     console.error("Admin console error:", err);
     res.status(500).send("Something went wrong.");
   }
 });
+
+app.post(
+  "/admin/users/:id/revoke-sessions",
+  requireLogin,
+  requirePermanentAdmin,
+  verifyCsrf,
+  async (req, res) => {
+    try {
+      const targetUserId = Number(req.params.id);
+
+      if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+        return res.status(400).send("Invalid user ID.");
+      }
+
+      if (targetUserId === Number(req.session.user.id)) {
+        return res
+          .status(409)
+          .send("Use the normal logout control for your own admin session.");
+      }
+
+      const target = await db.get(
+        "SELECT id, username, role FROM users WHERE id = ?",
+        [targetUserId]
+      );
+
+      if (!target) {
+        return res.status(404).send("User not found.");
+      }
+
+      const sockets = await io
+        .in(roomPresence.channel(DEFAULT_ROOM_ID))
+        .fetchSockets();
+
+      for (const socket of sockets) {
+        const socketUser =
+          socket.request &&
+          socket.request.session &&
+          socket.request.session.user;
+
+        if (socketUser && Number(socketUser.id) === targetUserId) {
+          socket.emit("session:expired");
+          socket.disconnect(true);
+        }
+      }
+
+      const sessionRows = await db.all(
+        "SELECT sid, sess FROM sessions"
+      );
+
+      let revokedSessions = 0;
+
+      for (const row of sessionRows) {
+        try {
+          const parsed = JSON.parse(row.sess);
+          if (
+            parsed &&
+            parsed.user &&
+            Number(parsed.user.id) === targetUserId
+          ) {
+            await db.run("DELETE FROM sessions WHERE sid = ?", [row.sid]);
+            revokedSessions += 1;
+          }
+        } catch {
+          // Invalid session JSON is ignored here; normal session cleanup handles it.
+        }
+      }
+
+      await writeAudit(
+        req.session.user.id,
+        "admin.sessions_revoke",
+        `Revoked active sessions for ${target.username}`,
+        {
+          targetUserId,
+          details: {
+            revokedSessions
+          }
+        }
+      );
+
+      await recordRequestSecurityEvent(
+        req,
+        "admin.sessions_revoke",
+        "NOTICE",
+        "success",
+        {
+          targetUsername: target.username,
+          revokedSessions
+        },
+        targetUserId
+      );
+
+      res.redirect("/admin");
+    } catch (err) {
+      console.error("Session revocation error:", err);
+      res.status(500).send("Something went wrong.");
+    }
+  }
+);
 
 app.get(
   "/admin/report.csv",
