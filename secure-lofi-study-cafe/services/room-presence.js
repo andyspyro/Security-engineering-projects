@@ -296,6 +296,8 @@ class RoomPresence {
              users.username,
              users.role,
              user_profiles.display_name,
+             user_profiles.availability_status,
+             user_profiles.avatar_style,
              user_profiles.last_seen_at,
              room_memberships.joined_at,
              room_memberships.last_joined_at,
@@ -318,6 +320,14 @@ class RoomPresence {
         displayName: row.display_name || row.username,
         role: row.role,
         online: Boolean(live),
+        availabilityStatus:
+          live && live.availabilityStatus
+            ? live.availabilityStatus
+            : row.availability_status || "studying",
+        avatarStyle:
+          live && live.avatarStyle
+            ? live.avatarStyle
+            : row.avatar_style || "latte",
         connectionCount: live ? live.connectionCount : 0,
         connectedToRoom: Boolean(live),
         lastSeenAt: live ? live.lastSeenAt : row.last_seen_at,
