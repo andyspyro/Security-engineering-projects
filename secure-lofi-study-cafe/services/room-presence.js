@@ -49,8 +49,8 @@ class RoomPresence {
     );
   }
 
-  async join(socket, user, profile = {}) {
-    const roomId = Number(this.defaultRoomId);
+  async join(socket, user, profile = {}, requestedRoomId = this.defaultRoomId) {
+    const roomId = Number(requestedRoomId);
 
     await this.ensureMembership(roomId, user.id);
 
