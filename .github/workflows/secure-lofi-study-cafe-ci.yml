@@ -42,12 +42,15 @@ jobs:
           node --check server.js
           node --check database.js
           node --check sqlite-session-store.js
+          node --check services/room-presence.js
+          node --check routes/api.js
           node --check public/cafe.js
           node --check public/admin.js
           node --check demo/auth.js
           node --check demo/demo.js
           node --check demo/admin-demo.js
           node --check scripts/security-smoke-test.js
+          node --check scripts/multi-client-integration-test.js
 
       - name: Compile EJS templates
         run: |
@@ -73,6 +76,9 @@ jobs:
 
       - name: Verify two-session realtime presence and RBAC
         run: npm run test:realtime
+
+      - name: Run multi-client realtime integration test
+        run: npm run test:integration
 
       - name: Build production container
         run: docker build -f ../Dockerfile ..
