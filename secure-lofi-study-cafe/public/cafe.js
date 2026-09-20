@@ -25,6 +25,7 @@
   const queueList = document.getElementById("queue-list");
   const historyList = document.getElementById("history-list");
   const membersList = document.getElementById("members-list");
+  const membersDetails = document.getElementById("members-details");
   const pendingList = document.getElementById("pending-list");
   const memberCount = document.getElementById("member-count");
   const inlineMemberCount = document.getElementById("inline-member-count");
@@ -1397,23 +1398,50 @@
   }
 
   if (mediaCollapse && mediaDock) {
-    const savedCollapsed =
-      localStorage.getItem("lofi.mediaCollapsed") === "true";
-    mediaDock.classList.toggle("is-collapsed", savedCollapsed);
-    mediaCollapse.setAttribute(
-      "aria-expanded",
-      savedCollapsed ? "false" : "true"
-    );
-    mediaCollapse.textContent = savedCollapsed ? "Expand" : "Mini";
+    const storedMediaPreference = localStorage.getItem("lofi.mediaCollapsed");
+    const compactByDefault =
+      storedMediaPreference === null &&
+      window.matchMedia("(max-width: 560px)").matches;
+    const initialCollapsed =
+      storedMediaPreference === "true" || compactByDefault;
 
-    mediaCollapse.addEventListener("click", () => {
-      const collapsed = mediaDock.classList.toggle("is-collapsed");
+    function setMediaCollapsed(collapsed, persist = true) {
+      mediaDock.classList.toggle("is-collapsed", collapsed);
       mediaCollapse.setAttribute(
         "aria-expanded",
         collapsed ? "false" : "true"
       );
-      mediaCollapse.textContent = collapsed ? "Expand" : "Mini";
-      localStorage.setItem("lofi.mediaCollapsed", String(collapsed));
+      mediaCollapse.textContent = collapsed ? "Expand" : "Mini player";
+
+      if (persist) {
+        localStorage.setItem("lofi.mediaCollapsed", String(collapsed));
+      }
+    }
+
+    setMediaCollapsed(initialCollapsed, false);
+
+    mediaCollapse.addEventListener("click", () => {
+      setMediaCollapsed(!mediaDock.classList.contains("is-collapsed"));
+    });
+  }
+
+  if (membersDetails) {
+    const storedMembersPreference =
+      localStorage.getItem("lofi.membersExpanded");
+    const mobileByDefault =
+      window.matchMedia("(max-width: 820px)").matches;
+
+    if (storedMembersPreference === null && mobileByDefault) {
+      membersDetails.open = false;
+    } else if (storedMembersPreference !== null) {
+      membersDetails.open = storedMembersPreference === "true";
+    }
+
+    membersDetails.addEventListener("toggle", () => {
+      localStorage.setItem(
+        "lofi.membersExpanded",
+        String(membersDetails.open)
+      );
     });
   }
   if (minimizeChatButton && chatBody) {
@@ -2026,7 +2054,12 @@
     }
 
     if (window.matchMedia("(max-width: 820px)").matches) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const reduceMotion =
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({
+        top: 0,
+        behavior: reduceMotion ? "auto" : "smooth"
+      });
     }
   }
 
