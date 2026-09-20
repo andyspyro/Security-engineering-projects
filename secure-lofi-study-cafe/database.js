@@ -357,11 +357,26 @@ async function initialize() {
     WHERE room_id IS NULL;
 
     -- A process restart cannot prove an old socket is still connected.
-    -- Reconcile any stale online rows to offline before accepting new sockets.
+    -- Preserve the most recent heartbeat as last-seen, then mark stale sockets offline.
+    UPDATE user_profiles
+    SET last_seen_at = COALESCE(
+      (
+        SELECT MAX(presence_sessions.last_seen_at)
+        FROM presence_sessions
+        WHERE presence_sessions.user_id = user_profiles.user_id
+      ),
+      user_profiles.last_seen_at
+    )
+    WHERE EXISTS (
+      SELECT 1
+      FROM presence_sessions
+      WHERE presence_sessions.user_id = user_profiles.user_id
+        AND presence_sessions.status = 'online'
+    );
+
     UPDATE presence_sessions
     SET status = 'offline',
-        disconnected_at = COALESCE(disconnected_at, CURRENT_TIMESTAMP),
-        last_seen_at = CURRENT_TIMESTAMP
+        disconnected_at = COALESCE(disconnected_at, CURRENT_TIMESTAMP)
     WHERE status = 'online';
 
     CREATE INDEX IF NOT EXISTS idx_sessions_expires_at
