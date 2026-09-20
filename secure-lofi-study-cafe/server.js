@@ -1402,8 +1402,8 @@ app.post(
     .matches(/^[a-zA-Z0-9_]+$/)
     .withMessage("Username can only contain letters, numbers, and underscores."),
   body("password")
-    .isLength({ min: 8 })
-    .withMessage("Password must be at least 8 characters."),
+    .isLength({ min: 12, max: 200 })
+    .withMessage("Password must be between 12 and 200 characters."),
   async (req, res) => {
     const errors = getErrorMessages(req);
 
@@ -1429,10 +1429,36 @@ app.post(
 
       const passwordHash = await bcrypt.hash(password, 12);
 
-      const createdUser = await db.run(
-        "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-        [username, passwordHash, role]
-      );
+      await db.exec("BEGIN IMMEDIATE");
+      let createdUser;
+
+      try {
+        createdUser = await db.run(
+          "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+          [username, passwordHash, role]
+        );
+
+        await db.run(
+          `
+          INSERT INTO user_profiles (user_id, display_name, last_seen_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          `,
+          [createdUser.lastID, username]
+        );
+
+        await db.run(
+          `
+          INSERT INTO room_memberships (room_id, user_id, last_joined_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          `,
+          [DEFAULT_ROOM_ID, createdUser.lastID]
+        );
+
+        await db.exec("COMMIT");
+      } catch (transactionError) {
+        await db.exec("ROLLBACK");
+        throw transactionError;
+      }
 
       await writeAudit(
         createdUser.lastID,
