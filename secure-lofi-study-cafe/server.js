@@ -1178,29 +1178,14 @@ async function queueTrackAgain(track, user) {
 ------------------------- */
 
 function getMembersList() {
-  return Array.from(onlineUsers.values()).map((member) => ({
-    id: member.id,
-    username: member.username,
-    role: member.role,
-    isTempAdmin: tempModeratorIds.has(member.id),
-    isController: controllerUserId === member.id,
-    playbackStatus: member.playbackStatus,
-    trackTitle: member.trackTitle,
-    followingRoom: member.followingRoom,
-    currentSeconds: member.currentSeconds,
-    isPlaying: member.isPlaying,
-    updatedAt: member.updatedAt,
-    avatarStyle: member.avatarStyle,
-    avatarX: member.avatarX,
-    avatarY: member.avatarY,
-    avatarImageUrl: member.hasAvatarImage
-      ? `/profile-image/${member.id}?v=${member.avatarImageVersion}`
-      : null
-  }));
+  return roomPresence.getMembers(DEFAULT_ROOM_ID, {
+    controllerUserId,
+    tempModeratorIds
+  });
 }
 
 function emitPresence() {
-  io.emit("presence:update", {
+  io.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit("presence:update", {
     members: getMembersList()
   });
 }
@@ -1228,34 +1213,33 @@ function selectFallbackController() {
   emitControllerUpdate();
 }
 
-function addSocketToPresence(socket, user) {
-  const existing = onlineUsers.get(user.id);
-  const isNewJoin = !existing;
+async function addSocketToPresence(socket, user) {
+  const avatar = defaultAvatarState(user.id);
+  const profile = await db.get(
+    `
+    SELECT users.avatar_image,
+           user_profiles.avatar_style
+    FROM users
+    LEFT JOIN user_profiles ON user_profiles.user_id = users.id
+    WHERE users.id = ?
+    `,
+    [user.id]
+  );
 
-  if (existing) {
-    existing.socketIds.add(socket.id);
-    existing.updatedAt = Date.now();
-  } else {
-    const avatar = defaultAvatarState(user.id);
-
-    onlineUsers.set(user.id, {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      socketIds: new Set([socket.id]),
-      playbackStatus: "Online",
-      trackTitle: "Not playing",
-      followingRoom: true,
-      currentSeconds: 0,
-      isPlaying: false,
-      avatarStyle: avatar.avatarStyle,
+  const joined = await roomPresence.join(
+    socket,
+    user,
+    {
+      avatarImage: profile ? profile.avatar_image : null,
+      avatarStyle:
+        profile && AVATAR_STYLES.includes(profile.avatar_style)
+          ? profile.avatar_style
+          : avatar.avatarStyle,
       avatarX: avatar.avatarX,
-      avatarY: avatar.avatarY,
-      hasAvatarImage: Boolean(user.avatarImage),
-      avatarImageVersion: Date.now(),
-      updatedAt: Date.now()
-    });
-  }
+      avatarY: avatar.avatarY
+    },
+    DEFAULT_ROOM_ID
+  );
 
   if (!controllerUserId && isModerator(user)) {
     controllerUserId = user.id;
@@ -1265,14 +1249,24 @@ function addSocketToPresence(socket, user) {
     emitControllerUpdate();
   }
 
-  if (isNewJoin) {
-    writeAudit(
+  if (joined.becameOnline) {
+    await writeAudit(
       user.id,
       "room.join",
-      "Joined the study room"
-    ).catch((err) => console.error("Join audit error:", err));
+      "Joined the study room",
+      { details: { roomId: DEFAULT_ROOM_ID } }
+    );
 
-    io.emit("room:system", {
+    io.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit("user:joined", {
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role
+      },
+      roomId: DEFAULT_ROOM_ID
+    });
+
+    io.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit("room:system", {
       text: `${user.username} joined the room.`
     });
   }
@@ -1280,32 +1274,35 @@ function addSocketToPresence(socket, user) {
   emitPresence();
 }
 
-function removeSocketFromPresence(socket, user) {
-  const member = onlineUsers.get(user.id);
+async function removeSocketFromPresence(socket, user) {
+  const departed = await roomPresence.leave(socket);
 
-  if (!member) {
-    return;
-  }
-
-  member.socketIds.delete(socket.id);
-
-  if (member.socketIds.size === 0) {
-    onlineUsers.delete(user.id);
+  if (departed.becameOffline) {
     nextVotes.delete(user.id);
 
-    writeAudit(
+    await writeAudit(
       user.id,
       "room.leave",
-      "Left the study room"
-    ).catch((err) => console.error("Leave audit error:", err));
+      "Left the study room",
+      { details: { roomId: departed.roomId } }
+    );
 
-    io.emit("room:system", {
+    io.to(roomPresence.channel(departed.roomId)).emit("user:left", {
+      userId: user.id,
+      roomId: departed.roomId,
+      lastSeenAt: new Date().toISOString()
+    });
+
+    io.to(roomPresence.channel(departed.roomId)).emit("room:system", {
       text: `${user.username} left the room.`
     });
   }
 
   selectFallbackController();
-  io.emit("vote:update", getVoteState());
+  io.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit(
+    "vote:update",
+    getVoteState()
+  );
   emitPresence();
 }
 
