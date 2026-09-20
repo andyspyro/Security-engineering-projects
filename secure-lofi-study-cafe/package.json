@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node server.js",
     "test:security": "node scripts/security-smoke-test.js",
-    "test:integration": "node scripts/multiuser-integration-test.js",
     "test:realtime": "node scripts/realtime-presence-test.js",
     "test:integration": "node scripts/multi-client-integration-test.js"
   },
