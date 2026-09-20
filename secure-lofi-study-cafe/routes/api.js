@@ -26,7 +26,8 @@ function createApiRouter({
   censorBadWords,
   writeAudit,
   writeSecurityEvent,
-  makeSessionRef
+  makeSessionRef,
+  authLimiter
 }) {
   const router = express.Router();
 
@@ -189,7 +190,7 @@ function createApiRouter({
     });
   });
 
-  router.post("/auth/register", verifyApiCsrf, async (req, res) => {
+  router.post("/auth/register", authLimiter, verifyApiCsrf, async (req, res) => {
     const username = String(req.body.username || "").trim();
     const password = String(req.body.password || "");
 
@@ -291,7 +292,7 @@ function createApiRouter({
     }
   });
 
-  router.post("/auth/login", verifyApiCsrf, async (req, res) => {
+  router.post("/auth/login", authLimiter, verifyApiCsrf, async (req, res) => {
     const username = String(req.body.username || "").trim();
     const password = String(req.body.password || "");
 
@@ -357,6 +358,18 @@ function createApiRouter({
       const user = req.session.user;
 
       await writeAudit(user.id, "auth.logout", "API logout");
+
+      const sockets = await io.in(presence.channel(defaultRoomId)).fetchSockets();
+      for (const socket of sockets) {
+        const socketUser =
+          socket.request &&
+          socket.request.session &&
+          socket.request.session.user;
+
+        if (socketUser && socketUser.id === user.id) {
+          socket.disconnect(true);
+        }
+      }
 
       await new Promise((resolve) => {
         req.session.destroy(() => resolve());
