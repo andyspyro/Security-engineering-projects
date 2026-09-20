@@ -1937,7 +1937,12 @@ summary:focus-visible,
 .app-right-rail {
   position: sticky;
   top: 92px;
+  grid-template-rows: auto auto minmax(360px, 1fr);
   max-height: calc(100vh - 108px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: .15rem;
+  scrollbar-gutter: stable;
 }
 
 .app-main {
@@ -2384,8 +2389,8 @@ details[open] > summary::after {
 .chat-panel {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  max-height: calc(65vh - 20px);
+  min-height: 360px;
+  max-height: none;
 }
 
 .chat-body {
@@ -3000,6 +3005,13 @@ details[open] > summary::after {
 
 .media-dock-heading {
   justify-content: space-between;
+}
+
+.media-view-actions {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex: 0 0 auto;
 }
 
 .media-dock-heading h2 {
@@ -3629,6 +3641,79 @@ details[open] > summary::after {
   }
 }
 
+/* Watch Together focus mode: media becomes the primary workspace while chat stays visible. */
+@media (min-width: 1181px) {
+  body.media-focus-mode .app-frame {
+    grid-template-columns:
+      minmax(230px, var(--sidebar-w))
+      minmax(0, 1fr);
+  }
+
+  body.media-focus-mode .app-main {
+    display: none;
+  }
+
+  body.media-focus-mode .app-right-rail {
+    position: static;
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: minmax(520px, 1.55fr) minmax(360px, .75fr);
+    grid-template-rows: auto minmax(360px, 1fr);
+    grid-template-areas:
+      "media members"
+      "media chat";
+    gap: 1rem;
+    max-height: none;
+    min-height: calc(100vh - 108px);
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  body.media-focus-mode .media-dock {
+    grid-area: media;
+    align-self: start;
+  }
+
+  body.media-focus-mode .members-panel {
+    grid-area: members;
+    max-height: 220px;
+  }
+
+  body.media-focus-mode .chat-panel {
+    grid-area: chat;
+    min-height: 460px;
+    max-height: calc(100vh - 330px);
+  }
+
+  body.media-focus-mode .media-player-shell {
+    min-height: 0;
+  }
+
+  body.media-focus-mode .media-player,
+  body.media-focus-mode .media-player iframe,
+  body.media-focus-mode .media-player-shell > iframe {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "heading"
+      "player"
+      "meta";
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed .media-progress-row,
+  body.media-focus-mode .media-dock.is-collapsed .media-quick-controls {
+    display: flex;
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed .media-queue-preview {
+    display: block;
+  }
+}
+
 /* Tablet: room remains visible while the communication/media pane stays beside it. */
 @media (min-width: 821px) and (max-width: 1180px) {
   .app-frame {
@@ -3665,7 +3750,9 @@ details[open] > summary::after {
     top: 84px;
     grid-column: 2;
     grid-row: 2;
+    grid-template-rows: auto auto minmax(360px, 1fr);
     max-height: calc(100vh - 96px);
+    overflow-y: auto;
   }
 
   .room-hero .avatar-stage {
@@ -3683,7 +3770,69 @@ details[open] > summary::after {
   }
 
   .chat-panel {
-    max-height: 44vh;
+    min-height: 380px;
+    max-height: none;
+  }
+
+  .media-dock {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  body.media-focus-mode .app-main {
+    display: none;
+  }
+
+  body.media-focus-mode .app-right-rail {
+    position: static;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, .75fr);
+    grid-template-rows: auto minmax(380px, 1fr);
+    grid-template-areas:
+      "media members"
+      "media chat";
+    gap: .8rem;
+    max-height: none;
+    min-height: calc(100vh - 130px);
+    overflow: visible;
+  }
+
+  body.media-focus-mode .media-dock {
+    position: static;
+    grid-area: media;
+  }
+
+  body.media-focus-mode .members-panel {
+    grid-area: members;
+    max-height: 210px;
+  }
+
+  body.media-focus-mode .chat-panel {
+    grid-area: chat;
+    min-height: 420px;
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "heading"
+      "player"
+      "meta";
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed .media-progress-row {
+    display: grid;
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed .media-quick-controls {
+    display: flex;
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed .media-queue-preview {
+    display: block;
   }
 }
 
@@ -3825,39 +3974,40 @@ details[open] > summary::after {
   }
 
   body[data-mobile-active="chat"] .app-frame {
-    height: calc(100dvh - 132px);
-    min-height: 0;
-    overflow: hidden;
+    min-height: calc(100dvh - 132px);
+    overflow: visible;
     padding-bottom: 0;
   }
 
   body[data-mobile-active="chat"] .app-right-rail {
-    display: grid !important;
-    grid-template-rows: auto auto minmax(0, 1fr);
-    height: 100%;
+    display: block !important;
     min-height: 0;
-    overflow: hidden;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
 
   body[data-mobile-active="chat"] .media-dock {
-    position: static;
-    margin-bottom: 0;
+    position: sticky;
+    top: 61px;
+    z-index: 18;
+    margin-bottom: .55rem;
   }
 
   body[data-mobile-active="chat"] .members-panel {
-    margin-bottom: 0;
+    margin-bottom: .55rem;
   }
 
   body[data-mobile-active="chat"] .members-details[open] .members-list {
-    max-height: 116px;
+    max-height: 150px;
   }
 
   body[data-mobile-active="chat"] .chat-panel {
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: max(420px, calc(100dvh - 300px));
     max-height: none;
-    overflow: hidden;
+    overflow: visible;
   }
 
   body[data-mobile-active="chat"] .chat-body {
@@ -3869,22 +4019,109 @@ details[open] > summary::after {
 
   body[data-mobile-active="chat"] .chat-log {
     flex: 1 1 auto;
-    min-height: 0;
-    max-height: none;
+    min-height: 320px;
+    max-height: 58vh;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
   }
 
   body[data-mobile-active="chat"] .chat-form {
-    position: static;
+    position: sticky;
+    bottom: calc(68px + env(safe-area-inset-bottom));
     flex: 0 0 auto;
+    z-index: 20;
     padding-top: .45rem;
+    background: linear-gradient(180deg, transparent, rgba(38,23,19,.98) 22%);
   }
 
   body[data-mobile-active="chat"] .typing-indicator,
   body[data-mobile-active="chat"] .reply-composer-banner {
     flex: 0 0 auto;
+  }
+
+  /* Persistent mini-player outside Chat so video remains visible while using Room/Music/Profile. */
+  body:not([data-mobile-active="chat"]) .app-right-rail {
+    display: block !important;
+    position: static;
+    height: 0;
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail .members-panel,
+  body:not([data-mobile-active="chat"]) .app-right-rail .chat-panel {
+    display: none !important;
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-dock {
+    position: fixed;
+    z-index: 48;
+    left: .65rem;
+    right: .65rem;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    display: grid !important;
+    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-areas:
+      "player heading"
+      "player meta";
+    gap: .4rem .6rem;
+    margin: 0;
+    padding: .5rem !important;
+    border-radius: 15px !important;
+    background: rgba(27,16,13,.96);
+    box-shadow: 0 18px 48px rgba(0,0,0,.5);
+    backdrop-filter: blur(16px);
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-player-shell {
+    grid-area: player;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+    border-radius: 10px;
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-player,
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-player iframe,
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-player-shell > iframe {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-dock-heading {
+    grid-area: heading;
+    min-width: 0;
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-dock-heading .eyebrow,
+  body:not([data-mobile-active="chat"]) .app-right-rail #media-requester,
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-view-actions,
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-progress-row,
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-quick-controls,
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-queue-preview {
+    display: none !important;
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-dock-heading h2 {
+    max-width: none;
+    font-size: .78rem;
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail .media-meta {
+    grid-area: meta;
+    display: block;
+    min-width: 0;
+  }
+
+  body:not([data-mobile-active="chat"]) .app-right-rail #media-sync-state {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: .62rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   body[data-mobile-active="room"] .room-hero {
@@ -3903,13 +4140,44 @@ details[open] > summary::after {
   }
 
   .media-dock {
-    position: sticky;
-    top: 61px;
-    z-index: 18;
-    margin-bottom: .55rem;
     padding: .65rem !important;
     border-radius: 16px !important;
     box-shadow: 0 14px 34px rgba(0,0,0,.28);
+  }
+
+  body.media-focus-mode[data-mobile-active="chat"] .media-dock {
+    position: relative;
+    top: auto;
+  }
+
+  body.media-focus-mode[data-mobile-active="chat"] .media-dock.is-collapsed,
+  body.media-focus-mode[data-mobile-active="chat"] .media-dock {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "heading"
+      "player"
+      "meta"
+      "controls"
+      "queue";
+  }
+
+  body.media-focus-mode[data-mobile-active="chat"] .media-player-shell {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+
+  body.media-focus-mode[data-mobile-active="chat"] .media-dock .media-progress-row {
+    display: grid;
+  }
+
+  body.media-focus-mode[data-mobile-active="chat"] .media-dock .media-quick-controls {
+    display: flex;
+    grid-area: controls;
+  }
+
+  body.media-focus-mode[data-mobile-active="chat"] .media-dock .media-queue-preview {
+    display: block;
+    grid-area: queue;
   }
 
   .media-dock.is-collapsed {

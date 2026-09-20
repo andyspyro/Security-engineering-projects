@@ -55,6 +55,7 @@
   const mediaProgressBar = document.getElementById("media-progress-bar");
   const mediaProgressText = document.getElementById("media-progress-text");
   const mediaCollapse = document.getElementById("media-collapse");
+  const mediaFocusToggle = document.getElementById("media-focus-toggle");
   const enablePlayback = document.getElementById("enable-playback");
   const mediaSyncButton = document.getElementById("media-sync-button");
   const mediaVoteButton = document.getElementById("media-vote-button");
@@ -1401,7 +1402,7 @@
     const storedMediaPreference = localStorage.getItem("lofi.mediaCollapsed");
     const compactByDefault =
       storedMediaPreference === null &&
-      window.matchMedia("(max-width: 820px)").matches;
+      window.matchMedia("(max-width: 1180px)").matches;
     const initialCollapsed =
       storedMediaPreference === "true" || compactByDefault;
 
@@ -1425,11 +1426,44 @@
     });
   }
 
+  if (mediaFocusToggle && mediaDock) {
+    function setMediaFocusMode(active) {
+      body.classList.toggle("media-focus-mode", active);
+      mediaFocusToggle.setAttribute("aria-pressed", String(active));
+      mediaFocusToggle.textContent = active ? "Back to Café" : "Large";
+
+      if (active && window.matchMedia("(max-width: 820px)").matches) {
+        setMobileView("chat");
+      }
+
+      requestAnimationFrame(() => {
+        try {
+          player?.setSize?.(
+            mediaDock.clientWidth,
+            Math.round(mediaDock.clientWidth * 9 / 16)
+          );
+        } catch {
+          // The iframe API can be unavailable while a video is loading.
+        }
+      });
+    }
+
+    mediaFocusToggle.addEventListener("click", () => {
+      setMediaFocusMode(!body.classList.contains("media-focus-mode"));
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && body.classList.contains("media-focus-mode")) {
+        setMediaFocusMode(false);
+      }
+    });
+  }
+
   if (membersDetails) {
     const storedMembersPreference =
       localStorage.getItem("lofi.membersExpanded");
     const mobileByDefault =
-      window.matchMedia("(max-width: 820px)").matches;
+      window.matchMedia("(max-width: 1180px)").matches;
 
     if (storedMembersPreference === null && mobileByDefault) {
       membersDetails.open = false;
