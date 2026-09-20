@@ -115,4 +115,4 @@ echo "NOTE: Cloudflare Quick Tunnels are intended for testing/development."
 echo "For a stable production URL, use the named-tunnel/Caddy procedure in SELF-HOSTING.md."
 echo
 
-exec npx --yes wrangler@latest tunnel quick-start "http://127.0.0.1:3000"
+npx --yes wrangler@latest tunnel quick-start "http://127.0.0.1:3000"
