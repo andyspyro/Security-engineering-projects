@@ -1724,7 +1724,8 @@ app.get("/cafe", requireLogin, async (req, res) => {
       messages,
       canModerate: isModerator(req.session.user),
       canAssignTempAdmin: isPermanentAdmin(req.session.user),
-      currentUserId: req.session.user.id
+      currentUserId: req.session.user.id,
+      roomId: DEFAULT_ROOM_ID
     });
   } catch (err) {
     console.error("Cafe page error:", err);
