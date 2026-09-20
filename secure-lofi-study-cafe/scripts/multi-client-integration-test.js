@@ -441,6 +441,73 @@ async function main() {
     "Multiple Bunny tabs created duplicate visible users."
   );
 
+  const adminSeesWatchingStatus = waitForEvent(
+    adminSocket,
+    "presence:update",
+    (payload) =>
+      Array.isArray(payload.members) &&
+      payload.members.some(
+        (member) =>
+          member.username === bunnyUsername &&
+          member.availabilityStatus === "watching"
+      )
+  );
+
+  const availabilityAck = await new Promise((resolve, reject) => {
+    bunnySocketTwo
+      .timeout(5000)
+      .emit(
+        "member:availability",
+        {
+          status: "watching",
+          csrfToken: bunny.csrfToken
+        },
+        (error, response) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve(response);
+        }
+      );
+  });
+
+  assert(
+    availabilityAck && availabilityAck.ok,
+    "Bunny availability update was rejected."
+  );
+  await adminSeesWatchingStatus;
+
+  const adminReceivesTyping = waitForEvent(
+    adminSocket,
+    "chat:typing",
+    (payload) =>
+      payload &&
+      payload.username === bunnyUsername &&
+      payload.typing === true
+  );
+
+  bunnySocketTwo.emit("chat:typing", { typing: true });
+  await adminReceivesTyping;
+  bunnySocketTwo.emit("chat:typing", { typing: false });
+
+  const adminReceivesMovement = waitForEvent(
+    adminSocket,
+    "member:moved",
+    (payload) =>
+      payload &&
+      Number(payload.userId) === Number(bunny.user.id) &&
+      Math.abs(Number(payload.x) - 72) < 0.01 &&
+      Math.abs(Number(payload.y) - 64) < 0.01
+  );
+
+  bunnySocketTwo.emit("member:move", {
+    x: 72,
+    y: 64
+  });
+
+  await adminReceivesMovement;
+
   const adminReceivesMessage = waitForEvent(
     adminSocket,
     "chat:new",
@@ -450,13 +517,83 @@ async function main() {
       message.message_text === "hello from bunny"
   );
 
+  const adminReceivesLiveOps = waitForEvent(
+    adminSocket,
+    "admin:activity",
+    (event) =>
+      event &&
+      event.type === "chat.message" &&
+      event.username === bunnyUsername
+  );
+
   bunnySocketTwo.emit("chat:send", {
     message: "hello from bunny",
     csrfToken: bunny.csrfToken
   });
 
   const message = await adminReceivesMessage;
+  await adminReceivesLiveOps;
   assert(message.id, "Realtime chat message did not contain a database ID.");
+
+  const bunnyReceivesReaction = waitForEvent(
+    bunnySocketTwo,
+    "message:reactions",
+    (payload) =>
+      payload &&
+      Number(payload.messageId) === Number(message.id) &&
+      Array.isArray(payload.reactions) &&
+      payload.reactions.some(
+        (reaction) => reaction.emoji === "💜" && Number(reaction.count) === 1
+      )
+  );
+
+  const reactionAck = await new Promise((resolve, reject) => {
+    adminSocket
+      .timeout(5000)
+      .emit(
+        "chat:react",
+        {
+          messageId: message.id,
+          emoji: "💜",
+          csrfToken: admin.csrfToken
+        },
+        (error, response) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve(response);
+        }
+      );
+  });
+
+  assert(
+    reactionAck && reactionAck.ok,
+    "Admin reaction to Bunny message was rejected."
+  );
+  await bunnyReceivesReaction;
+
+  const bunnyReceivesReply = waitForEvent(
+    bunnySocketTwo,
+    "chat:new",
+    (reply) =>
+      reply &&
+      reply.username === adminUsername &&
+      Number(reply.reply_to_message_id) === Number(message.id) &&
+      reply.reply_username === bunnyUsername
+  );
+
+  adminSocket.emit("chat:send", {
+    message: "@bunny keep studying!",
+    replyToMessageId: message.id,
+    csrfToken: admin.csrfToken
+  });
+
+  const replyMessage = await bunnyReceivesReply;
+  assert(
+    replyMessage.reply_message_text === "hello from bunny",
+    "Reply event did not contain the referenced message preview."
+  );
 
   const persistedMessages = await http("/api/rooms/1/messages", {
     cookie: admin.cookie
@@ -470,6 +607,28 @@ async function main() {
           item.message_text === "hello from bunny"
       ),
     "Realtime message was not persisted in SQLite."
+  );
+
+  const persistedOriginal = persistedMessages.payload.messages.find(
+    (item) => item.id === message.id
+  );
+  const persistedReply = persistedMessages.payload.messages.find(
+    (item) => item.id === replyMessage.id
+  );
+
+  assert(
+    persistedOriginal &&
+      Array.isArray(persistedOriginal.reactions) &&
+      persistedOriginal.reactions.some(
+        (reaction) => reaction.emoji === "💜" && Number(reaction.count) === 1
+      ),
+    "Message reaction was not persisted."
+  );
+
+  assert(
+    persistedReply &&
+      Number(persistedReply.reply_to_message_id) === Number(message.id),
+    "Message reply relationship was not persisted."
   );
 
   const bunnyLeavesAfterNetworkLoss = waitForEvent(
@@ -564,7 +723,12 @@ async function main() {
   console.log("- unapproved API origin returns 403");
   console.log("- realtime cross-client presence");
   console.log("- multiple tabs collapse to one visible user with connection counting");
+  console.log("- realtime avatar movement deltas");
+  console.log("- server-authoritative availability states");
+  console.log("- realtime typing indicators");
+  console.log("- admin-only live operations events");
   console.log("- realtime cross-client chat");
+  console.log("- persistent replies and emoji reactions");
   console.log("- persisted messages");
   console.log("- network-style disconnect and authenticated reconnect");
   console.log("- explicit logout removes Bunny from live presence");
