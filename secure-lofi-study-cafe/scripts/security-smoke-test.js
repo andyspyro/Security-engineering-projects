@@ -83,6 +83,17 @@ async function main() {
     }
   }
 
+  const profileColumns = await db.all(
+    "PRAGMA table_info(user_profiles)"
+  );
+  const profileColumnNames = new Set(
+    profileColumns.map((column) => column.name)
+  );
+
+  if (!profileColumnNames.has("availability_status")) {
+    throw new Error("Missing user_profiles availability_status column.");
+  }
+
   const journal = await db.get("PRAGMA journal_mode");
   if (
     !journal ||
