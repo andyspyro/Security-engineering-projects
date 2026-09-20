@@ -107,6 +107,7 @@ class RoomPresence {
         currentSeconds: 0,
         isPlaying: false,
         avatarStyle: profile.avatarStyle || "latte",
+        availabilityStatus: profile.availabilityStatus || "studying",
         avatarX: Number(profile.avatarX || 50),
         avatarY: Number(profile.avatarY || 50),
         hasAvatarImage: Boolean(profile.avatarImage),
@@ -273,6 +274,7 @@ class RoomPresence {
         currentSeconds: member.currentSeconds,
         isPlaying: member.isPlaying,
         avatarStyle: member.avatarStyle,
+        availabilityStatus: member.availabilityStatus || "studying",
         avatarX: member.avatarX,
         avatarY: member.avatarY,
         avatarImageUrl: member.hasAvatarImage
