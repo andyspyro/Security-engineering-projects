@@ -86,7 +86,15 @@ const tempModeratorIds = new Set();
 const nextVotes = new Map();
 
 const AVATAR_STYLES = ["latte", "mocha", "matcha", "berry", "sky", "lavender"];
-const AVAILABILITY_STATUSES = new Set(["studying", "chat", "dnd", "afk"]);
+const AVAILABILITY_STATUSES = new Set([
+  "studying",
+  "chat",
+  "dnd",
+  "afk",
+  "listening",
+  "watching"
+]);
+const REACTION_EMOJIS = new Set(["☕", "💜", "👍", "✨", "😂"]);
 const PROFILE_IMAGE_MAX_BYTES = 512 * 1024;
 const PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -959,6 +967,57 @@ function parseYouTubeTimestamp(value) {
 }
 
 /* -------------------------
+   Chat helpers
+------------------------- */
+
+async function getReactionSummary(messageId) {
+  return db.all(
+    `
+    SELECT emoji,
+           COUNT(*) AS count
+    FROM message_reactions
+    WHERE message_id = ?
+    GROUP BY emoji
+    ORDER BY emoji ASC
+    `,
+    [messageId]
+  );
+}
+
+async function getChatMessage(messageId) {
+  const message = await db.get(
+    `
+    SELECT messages.id,
+           messages.message_text,
+           messages.reply_to_message_id,
+           messages.created_at,
+           users.username,
+           users.id AS user_id,
+           users.role AS user_role,
+           reply.message_text AS reply_message_text,
+           reply_user.username AS reply_username
+    FROM messages
+    JOIN users ON messages.user_id = users.id
+    LEFT JOIN messages AS reply
+      ON reply.id = messages.reply_to_message_id
+    LEFT JOIN users AS reply_user
+      ON reply_user.id = reply.user_id
+    WHERE messages.id = ?
+      AND messages.room_id = ?
+      AND messages.deleted_at IS NULL
+    `,
+    [messageId, DEFAULT_ROOM_ID]
+  );
+
+  if (!message) {
+    return null;
+  }
+
+  message.reactions = await getReactionSummary(message.id);
+  return message;
+}
+
+/* -------------------------
    Pending request helpers
 ------------------------- */
 
@@ -1798,12 +1857,19 @@ app.get("/cafe", requireLogin, async (req, res) => {
       `
       SELECT messages.id,
              messages.message_text,
+             messages.reply_to_message_id,
              messages.created_at,
              users.username,
              users.id AS user_id,
-             users.role AS user_role
+             users.role AS user_role,
+             reply.message_text AS reply_message_text,
+             reply_user.username AS reply_username
       FROM messages
       JOIN users ON messages.user_id = users.id
+      LEFT JOIN messages AS reply
+        ON reply.id = messages.reply_to_message_id
+      LEFT JOIN users AS reply_user
+        ON reply_user.id = reply.user_id
       WHERE messages.deleted_at IS NULL
         AND messages.room_id = ?
       ORDER BY messages.created_at DESC
@@ -1812,6 +1878,34 @@ app.get("/cafe", requireLogin, async (req, res) => {
     ,
       [DEFAULT_ROOM_ID]
     );
+
+    const reactionRows = await db.all(
+      `
+      SELECT message_reactions.message_id,
+             message_reactions.emoji,
+             COUNT(*) AS count
+      FROM message_reactions
+      JOIN messages ON messages.id = message_reactions.message_id
+      WHERE messages.room_id = ?
+        AND messages.deleted_at IS NULL
+      GROUP BY message_reactions.message_id, message_reactions.emoji
+      `,
+      [DEFAULT_ROOM_ID]
+    );
+
+    const reactionsByMessage = new Map();
+    for (const reaction of reactionRows) {
+      const list = reactionsByMessage.get(reaction.message_id) || [];
+      list.push({
+        emoji: reaction.emoji,
+        count: Number(reaction.count || 0)
+      });
+      reactionsByMessage.set(reaction.message_id, list);
+    }
+
+    for (const message of messages) {
+      message.reactions = reactionsByMessage.get(message.id) || [];
+    }
 
     res.render("cafe", {
       messages,
@@ -3180,9 +3274,36 @@ io.on("connection", async (socket) => {
       const storedMessage =
         user.role === "admin" ? rawMessage : censorBadWords(rawMessage);
 
+      let replyToMessageId = Number(data.replyToMessageId || 0) || null;
+
+      if (replyToMessageId) {
+        const replyTarget = await db.get(
+          `
+          SELECT id
+          FROM messages
+          WHERE id = ?
+            AND room_id = ?
+            AND deleted_at IS NULL
+          `,
+          [replyToMessageId, DEFAULT_ROOM_ID]
+        );
+
+        if (!replyTarget) {
+          replyToMessageId = null;
+        }
+      }
+
       const result = await db.run(
-        "INSERT INTO messages (room_id, user_id, message_text) VALUES (?, ?, ?)",
-        [DEFAULT_ROOM_ID, user.id, storedMessage]
+        `
+        INSERT INTO messages (
+          room_id,
+          user_id,
+          message_text,
+          reply_to_message_id
+        )
+        VALUES (?, ?, ?, ?)
+        `,
+        [DEFAULT_ROOM_ID, user.id, storedMessage, replyToMessageId]
       );
 
       await writeAudit(
@@ -3199,21 +3320,7 @@ io.on("connection", async (socket) => {
         }
       );
 
-      const savedMessage = await db.get(
-        `
-        SELECT messages.id,
-               messages.message_text,
-               messages.created_at,
-               users.username,
-               users.id AS user_id,
-               users.role AS user_role
-        FROM messages
-        JOIN users ON messages.user_id = users.id
-        WHERE messages.id = ?
-          AND messages.room_id = ?
-        `,
-        [result.lastID, DEFAULT_ROOM_ID]
-      );
+      const savedMessage = await getChatMessage(result.lastID);
 
       io.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit(
         "message:created",
@@ -3225,6 +3332,108 @@ io.on("connection", async (socket) => {
       );
     } catch (err) {
       console.error("Live chat error:", err);
+    }
+  });
+
+  socket.on("chat:typing", (data) => {
+    const now = Date.now();
+    const previous = Number(socket.data.lastTypingEventAt || 0);
+
+    if (now - previous < 120) {
+      return;
+    }
+
+    socket.data.lastTypingEventAt = now;
+
+    socket.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit("chat:typing", {
+      userId: user.id,
+      username: user.username,
+      typing: Boolean(data && data.typing)
+    });
+  });
+
+  socket.on("chat:react", async (data, acknowledge) => {
+    const reply = typeof acknowledge === "function" ? acknowledge : () => {};
+
+    try {
+      if (!data || data.csrfToken !== userSession.csrfToken) {
+        reply({ ok: false, error: "Invalid security token." });
+        return;
+      }
+
+      const messageId = Number(data.messageId);
+      const emoji = String(data.emoji || "");
+
+      if (
+        !Number.isInteger(messageId) ||
+        messageId < 1 ||
+        !REACTION_EMOJIS.has(emoji)
+      ) {
+        reply({ ok: false, error: "Invalid reaction." });
+        return;
+      }
+
+      const message = await db.get(
+        `
+        SELECT id
+        FROM messages
+        WHERE id = ?
+          AND room_id = ?
+          AND deleted_at IS NULL
+        `,
+        [messageId, DEFAULT_ROOM_ID]
+      );
+
+      if (!message) {
+        reply({ ok: false, error: "Message not found." });
+        return;
+      }
+
+      const existing = await db.get(
+        `
+        SELECT 1 AS present
+        FROM message_reactions
+        WHERE message_id = ?
+          AND user_id = ?
+          AND emoji = ?
+        `,
+        [messageId, user.id, emoji]
+      );
+
+      if (existing) {
+        await db.run(
+          `
+          DELETE FROM message_reactions
+          WHERE message_id = ?
+            AND user_id = ?
+            AND emoji = ?
+          `,
+          [messageId, user.id, emoji]
+        );
+      } else {
+        await db.run(
+          `
+          INSERT INTO message_reactions (message_id, user_id, emoji)
+          VALUES (?, ?, ?)
+          `,
+          [messageId, user.id, emoji]
+        );
+      }
+
+      const reactions = await getReactionSummary(messageId);
+
+      io.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit(
+        "message:reactions",
+        {
+          messageId,
+          reactions
+        }
+      );
+
+      reply({ ok: true, reactions });
+    } catch (err) {
+      console.error("Chat reaction error:", err);
+      reply({ ok: false, error: "Could not update reaction." });
     }
   });
 
