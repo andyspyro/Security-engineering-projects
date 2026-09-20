@@ -1,5 +1,54 @@
 # Changelog
 
+## 6.0.0 — Responsive Watch Together & Social UX
+
+### Responsive shell
+
+* Added a true phone application mode with a compact header and sticky Room / Chat / Music / Profile / authorized Admin bottom navigation.
+* Mobile shows one primary view at a time instead of vertically stacking the desktop application.
+* Added a tablet two-pane room + communication layout.
+* Retained and refined the desktop three-zone navigation / room / communication shell.
+* Added component container queries for media, music, and member panels.
+* Added safe-area-aware mobile spacing and larger touch targets.
+
+### Watch Together
+
+* Moved the authoritative YouTube player into a pinned media-and-chat experience.
+* Added title, requester, playback/sync state, progress, queue preview, Sync, Vote Next, and permission-gated moderator controls.
+* Added a collapsible mobile mini-player mode.
+* Added `playsinline` and an explicit user-gesture recovery control for autoplay-blocked playback.
+
+### Social chat
+
+* Added ephemeral authenticated typing indicators.
+* Added persistent message replies through `reply_to_message_id`.
+* Added persistent allowlisted emoji reactions through `message_reactions`.
+* Added mention highlighting and optional user-approved browser notifications.
+* Added unread badges and mobile unread indicator.
+* Added animated message entry and join/leave banners.
+
+### Presence & productivity
+
+* Added Listening and Watching to server-authoritative availability states.
+* Added a local 25-minute focus / 5-minute break Pomodoro tool.
+* Added Espresso, Midnight, and Plum Night UI themes.
+* Added notification and mini-player interface preferences.
+* Added idle avatar and ambient room animations while respecting reduced-motion settings.
+
+### Admin operations
+
+* Added an admin-only Socket.IO operations channel.
+* Added live online-user and socket counts, admin latency, and realtime connect/disconnect/chat/reaction activity.
+* Preserved the existing server-authorized user inspector, session inventory, network telemetry, audit logs, security event stream, and session revocation controls.
+
+### Persistence and validation
+
+* Added `message_reactions` table and index.
+* Added `messages.reply_to_message_id`.
+* Updated API message output for replies/reactions.
+* Expanded multi-client tests for movement, availability, typing, replies, reactions, and admin-only live operations.
+* Added `RESPONSIVE-WATCH-TOGETHER-v6.0.md`.
+
 ## 5.0.0 — Production UI/UX Redesign
 
 ### Application shell
