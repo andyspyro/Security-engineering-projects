@@ -128,6 +128,22 @@ function createApiRouter({
       !supplied ||
       supplied !== req.session.csrfToken
     ) {
+      const sessionUser = req.session && req.session.user;
+
+      writeSecurityEvent({
+        eventType: "csrf.api_validation_failed",
+        severity: "HIGH",
+        actorUserId: sessionUser ? sessionUser.id : null,
+        usernameSnapshot: sessionUser ? sessionUser.username : null,
+        outcome: "blocked",
+        httpMethod: req.method,
+        route: req.originalUrl,
+        requestId: req.requestId,
+        sessionRef: makeSessionRef(req.sessionID)
+      }).catch((err) => {
+        console.error("API CSRF security log failed:", err);
+      });
+
       return jsonError(
         res,
         403,
@@ -312,6 +328,21 @@ function createApiRouter({
       );
 
       if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+        await writeSecurityEvent({
+          eventType: "auth.api_login_failed",
+          severity: "WARNING",
+          actorUserId: user ? user.id : null,
+          usernameSnapshot: username.slice(0, 30),
+          outcome: "failed",
+          httpMethod: req.method,
+          route: req.originalUrl,
+          requestId: req.requestId,
+          sessionRef: makeSessionRef(req.sessionID),
+          metadata: {
+            reason: user ? "bad_password" : "unknown_username"
+          }
+        });
+
         return jsonError(
           res,
           401,
@@ -339,6 +370,18 @@ function createApiRouter({
       });
 
       await writeAudit(user.id, "auth.login", "Successful API login");
+
+      await writeSecurityEvent({
+        eventType: "auth.api_login_success",
+        severity: "INFO",
+        actorUserId: user.id,
+        usernameSnapshot: user.username,
+        outcome: "success",
+        httpMethod: req.method,
+        route: req.originalUrl,
+        requestId: req.requestId,
+        sessionRef: makeSessionRef(req.sessionID)
+      });
 
       res.json({
         user: req.session.user,
@@ -778,6 +821,29 @@ function createApiRouter({
       });
     }
   );
+
+  router.use((req, res) => {
+    jsonError(
+      res,
+      404,
+      "API_ROUTE_NOT_FOUND",
+      "Requested API route does not exist."
+    );
+  });
+
+  router.use((err, req, res, next) => {
+    console.error("Unhandled API error:", err);
+    if (res.headersSent) {
+      return next(err);
+    }
+
+    jsonError(
+      res,
+      500,
+      "INTERNAL_ERROR",
+      "Unexpected server failure."
+    );
+  });
 
   return router;
 }
