@@ -4,6 +4,7 @@
   const body = document.body;
   const csrfToken = body.dataset.csrf;
   const currentUserId = Number(body.dataset.userId);
+  const currentUsername = String(body.dataset.username || "");
   const roomId = Number(body.dataset.roomId || 1);
   const canModerate = body.dataset.canModerate === "true";
   const canAssign = body.dataset.canAssign === "true";
@@ -46,6 +47,33 @@
   const memberProfileDialog = document.getElementById("member-profile-dialog");
   const memberProfileContent = document.getElementById("member-profile-content");
   const toastRegion = document.getElementById("toast-region");
+  const mediaDock = document.getElementById("media-dock");
+  const mediaTitle = document.getElementById("media-title");
+  const mediaRequester = document.getElementById("media-requester");
+  const mediaSyncState = document.getElementById("media-sync-state");
+  const mediaProgressBar = document.getElementById("media-progress-bar");
+  const mediaProgressText = document.getElementById("media-progress-text");
+  const mediaCollapse = document.getElementById("media-collapse");
+  const enablePlayback = document.getElementById("enable-playback");
+  const mediaSyncButton = document.getElementById("media-sync-button");
+  const mediaVoteButton = document.getElementById("media-vote-button");
+  const mediaQueuePreview = document.getElementById("media-queue-preview");
+  const typingIndicator = document.getElementById("typing-indicator");
+  const unreadBadge = document.getElementById("unread-badge");
+  const mobileUnreadDot = document.getElementById("mobile-unread-dot");
+  const replyComposerBanner = document.getElementById("reply-composer-banner");
+  const replyComposerTitle = document.getElementById("reply-composer-title");
+  const replyComposerText = document.getElementById("reply-composer-text");
+  const replyCancel = document.getElementById("reply-cancel");
+  const themeSelect = document.getElementById("theme-select");
+  const notificationPreference = document.getElementById("notification-preference");
+  const focusDisplay = document.getElementById("focus-timer-display");
+  const focusStart = document.getElementById("focus-start");
+  const focusReset = document.getElementById("focus-reset");
+  const focusMode = document.getElementById("focus-mode");
+  const focusModeBadge = document.getElementById("focus-mode-badge");
+  const joinLeaveBanner = document.getElementById("join-leave-banner");
+  const mobileMoreButton = document.getElementById("mobile-more-button");
 
   let latestMembers = [];
   let player = null;
@@ -53,6 +81,13 @@
   let playerState = null;
   let controllerState = null;
   let followingRoom = true;
+  let currentReply = null;
+  let unreadCount = 0;
+  let typingStopTimer = null;
+  const typingUsers = new Map();
+  let focusIsBreak = false;
+  let focusRemainingSeconds = 25 * 60;
+  let focusTimerId = null;
 
   const messageIds = new Set(
     Array.from(
@@ -190,7 +225,9 @@
     studying: "Studying",
     chat: "Available to chat",
     dnd: "Do not disturb",
-    afk: "AFK"
+    afk: "AFK",
+    listening: "Listening",
+    watching: "Watching"
   };
 
   function availabilityLabel(value) {
