@@ -126,6 +126,7 @@ async function initialize() {
       user_id INTEGER PRIMARY KEY,
       display_name TEXT,
       avatar_style TEXT NOT NULL DEFAULT 'latte',
+      availability_status TEXT NOT NULL DEFAULT 'studying',
       last_seen_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -257,6 +258,11 @@ async function initialize() {
     "users",
     "avatar_image",
     "ALTER TABLE users ADD COLUMN avatar_image TEXT"
+  );
+  await addColumnIfMissing(
+    "user_profiles",
+    "availability_status",
+    "ALTER TABLE user_profiles ADD COLUMN availability_status TEXT NOT NULL DEFAULT 'studying'"
   );
   await addColumnIfMissing(
     "messages",
