@@ -4029,3 +4029,59 @@ details[open] > summary::after {
     transition: none !important;
   }
 }
+
+
+/* Admin live operations stream */
+.admin-live-stream {
+  display: grid;
+  gap: .45rem;
+  max-height: 360px;
+  margin-top: .8rem;
+  overflow-y: auto;
+}
+
+.admin-live-empty {
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.admin-live-row {
+  display: grid;
+  grid-template-columns: 86px minmax(130px, .35fr) 1fr;
+  gap: .65rem;
+  align-items: center;
+  border: 1px solid rgba(128, 90, 67, .5);
+  border-radius: 12px;
+  padding: .65rem .75rem;
+  background: rgba(15, 9, 7, .46);
+}
+
+.admin-live-row time {
+  color: var(--muted);
+  font-size: .72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-live-row code {
+  overflow: hidden;
+  color: var(--amber-soft);
+  font-size: .72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-live-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: .8rem;
+}
+
+@media (max-width: 700px) {
+  .admin-live-row {
+    grid-template-columns: 1fr;
+    gap: .2rem;
+  }
+}
