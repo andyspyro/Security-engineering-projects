@@ -1606,12 +1606,59 @@
 
     socket.emit("chat:send", {
       message,
-      csrfToken
+      csrfToken,
+      replyToMessageId: currentReply ? currentReply.id : null
     });
 
     chatInput.value = "";
+    clearReplyTarget();
+    socket.emit("chat:typing", { typing: false });
   });
 
+  chatLog.addEventListener("click", (event) => {
+    const replyButton = event.target.closest("[data-reply-message]");
+    if (replyButton) {
+      setReplyTarget(replyButton.dataset.replyMessage);
+      return;
+    }
+
+    const reactionButton = event.target.closest("[data-react-message]");
+    if (!reactionButton) {
+      return;
+    }
+
+    socket.emit(
+      "chat:react",
+      {
+        messageId: Number(reactionButton.dataset.reactMessage),
+        emoji: reactionButton.dataset.reactEmoji,
+        csrfToken
+      },
+      (response) => {
+        if (!response || !response.ok) {
+          showToast(
+            (response && response.error) || "Could not update reaction.",
+            "error"
+          );
+        }
+      }
+    );
+  });
+
+  if (replyCancel) {
+    replyCancel.addEventListener("click", clearReplyTarget);
+  }
+
+  chatInput.addEventListener("input", () => {
+    socket.emit("chat:typing", {
+      typing: chatInput.value.trim().length > 0
+    });
+
+    clearTimeout(typingStopTimer);
+    typingStopTimer = setTimeout(() => {
+      socket.emit("chat:typing", { typing: false });
+    }, 1400);
+  });
   function applyRoomSnapshot(snapshot) {
     if (!snapshot) {
       return;
@@ -1709,6 +1756,7 @@
 
   socket.on("connect", () => {
     socketStatus.textContent = "Syncing";
+    document.getElementById("mobile-connection-dot")?.classList.add("online");
     showToast("Connected. Synchronizing room state…", "success");
     socketStatus.classList.remove("live");
     loadInitialRoomMembers();
@@ -1718,6 +1766,7 @@
 
   socket.on("disconnect", () => {
     socketStatus.textContent = "Reconnecting";
+    document.getElementById("mobile-connection-dot")?.classList.remove("online");
     showToast("Connection lost. Reconnecting automatically…", "warning");
     socketStatus.classList.remove("live");
 
@@ -1753,6 +1802,43 @@
   socket.on("chat:new", (message) => {
     appendMessage(message);
     setSpeechBubble(message.username, message.message_text);
+    notifyMention(message);
+
+    const mobileChatActive = body.dataset.mobileActive === "chat";
+    const chatVisible =
+      window.matchMedia("(min-width: 821px)").matches || mobileChatActive;
+
+    if (
+      Number(message.user_id) !== currentUserId &&
+      (!chatVisible || document.hidden)
+    ) {
+      updateUnread(1);
+    }
+  });
+
+  socket.on("message:reactions", ({ messageId, reactions }) => {
+    renderReactionSummary(messageId, reactions || []);
+  });
+
+  socket.on("chat:typing", ({ userId, username, typing }) => {
+    if (Number(userId) === currentUserId) {
+      return;
+    }
+
+    if (typing) {
+      typingUsers.set(Number(userId), username);
+    } else {
+      typingUsers.delete(Number(userId));
+    }
+
+    if (typingIndicator) {
+      const names = Array.from(typingUsers.values());
+      typingIndicator.textContent = !names.length
+        ? ""
+        : names.length === 1
+          ? names[0] + " is typing…"
+          : names.slice(0, 2).join(", ") + " are typing…";
+    }
   });
 
   socket.on("chat:deleted", ({ id }) => {
@@ -1769,6 +1855,7 @@
 
   socket.on("room:system", (message) => {
     appendMessage(message, true);
+    showJoinLeaveBanner(message && message.text);
   });
 
   socket.on("presence:update", ({ members }) => {
