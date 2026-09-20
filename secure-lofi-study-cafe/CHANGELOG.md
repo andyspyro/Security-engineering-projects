@@ -1,5 +1,53 @@
 # Changelog
 
+## 5.0.0 — Production UI/UX Redesign
+
+### Application shell
+
+* Replaced the narrow two-column café layout with a responsive three-region application shell.
+* Added a left room/profile/navigation rail, large center experience, and dedicated members/chat rail.
+* Expanded the Café Floor into the primary visual interaction surface.
+* Added responsive tablet and phone stacking behavior.
+
+### Member experience
+
+* Added server-authoritative availability states: Studying, Available to chat, Do not disturb, and AFK.
+* Availability is persisted in `user_profiles` and synchronized through Socket.IO presence.
+* Added room-safe member profile dialogs.
+* Made avatars and member rows keyboard/click accessible.
+* Kept administrative telemetry out of normal member profiles.
+
+### Movement
+
+* Added requestAnimationFrame interpolation for remote avatars.
+* Remote network updates now set target positions rather than directly snapping every coordinate.
+* Retained server validation/clamping and authoritative room snapshots.
+
+### Chat and music
+
+* Moved chat into a dedicated realtime rail with a sticky composer.
+* Added compact message identity visuals and contextual moderator message actions.
+* Added connection/reconnect toast feedback.
+* Reorganized music into now-playing, user actions, queue/request/history, and permission-gated moderator controls.
+
+### Admin control plane
+
+* Added sticky section navigation across overview, users, sessions, realtime, moderation, music, audit, security, and system views.
+* Added a user inspector that separates account information, connection information, and credential/privacy boundaries.
+* Added coarse browser/OS/device parsing from intentionally collected user-agent data.
+* Added confirmation before destructive session revocation.
+
+### Accessibility
+
+* Added stronger focus states and larger interaction targets.
+* Added semantic navigation and accessible dialogs.
+* Preserved reduced-motion behavior.
+* Improved desktop, tablet, and mobile layout behavior.
+
+### Documentation
+
+* Added `PRODUCTION-UI-UX-REDESIGN-v5.0.md`.
+
 ## 4.2.0 — Realtime Performance & Admin Operations
 
 ### Movement performance
