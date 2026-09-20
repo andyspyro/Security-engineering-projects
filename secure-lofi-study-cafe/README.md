@@ -1,15 +1,15 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 5.0.0  
+> **Release:** 6.0.0  
 > **Type:** self-hosted secure realtime web application  
 > **Runtime:** Node.js 24 LTS, Express, EJS, Socket.IO  
 > **Persistence:** self-hosted SQLite in WAL mode  
 > **Service manager:** systemd  
 > **Security focus:** authentication, RBAC, CSRF, session security, host hardening, SQL telemetry, audit logging, backups, incident reconstruction
 
-## What changed in v5.0
+## What changed in v6.0
 
-Version 5.0 keeps the production multi-user architecture and redesigns the application into a responsive three-panel product interface with a larger interactive café, interpolated remote movement, room-safe member profiles, server-authoritative availability statuses, a dedicated chat rail, clearer music workflows, and a navigable administrator control plane.
+Version 6.0 adds device-specific mobile/tablet/desktop application shells, a synchronized Watch Together player embedded with the realtime communication experience, persistent chat replies and emoji reactions, typing/mention/unread UX, Listening/Watching presence states, a Pomodoro focus timer, themes/notification preferences, container-query component behavior, richer motion with reduced-motion support, and an admin-only live operations stream.
 
 The full application is designed to run on a Linux machine you control:
 
@@ -34,6 +34,20 @@ your server
 This is the deployment where an administrator on one device and a normal user such as `bunny` on another device use the same account database, room presence, chat, moderation state, and security logs.
 
 The GitHub Pages build remains a static interface showcase only. It is not the authoritative multi-user backend.
+
+## v6.0 responsive Watch Together experience
+
+Phones no longer receive a compressed desktop layout. Mobile uses a compact header and sticky bottom navigation for Room, Chat, Music, Profile, and Admin when authorized. Only one primary mobile view is shown at a time.
+
+Tablets use a two-pane room + communication layout. Desktop keeps the three-zone navigation / main room / communication shell.
+
+The Chat view now includes a pinned **Watch Together** panel above chat with the authoritative YouTube player, title, requester, sync state, progress, queue preview, and permission-aware controls. On mobile the panel can collapse into a compact mini-player.
+
+Chat now supports server-backed replies and emoji reactions plus ephemeral typing indicators, mention highlighting, and unread indicators. User presence adds Listening and Watching states. Profile preferences add Espresso/Midnight/Plum themes, optional browser notifications, and a local 25/5 Pomodoro timer.
+
+The permanent-admin console includes a live operations stream for authorized admin sockets alongside the existing user inspector, sessions, IP/user-agent telemetry, audit logs, and security events.
+
+See [RESPONSIVE-WATCH-TOGETHER-v6.0.md](RESPONSIVE-WATCH-TOGETHER-v6.0.md).
 
 ## v5.0 product UI
 
@@ -204,6 +218,7 @@ Persistent tables:
 
 * users;
 * messages;
+* message_reactions;
 * music_requests;
 * music_queue;
 * sessions;
@@ -433,7 +448,15 @@ See [PERFORMANCE-ADMIN-OPS-v4.2.md](PERFORMANCE-ADMIN-OPS-v4.2.md).
 * moderator approval;
 * vote-next;
 * synchronized player state;
-* mobile-responsive interface.
+* mobile tabbed interface;
+* tablet two-pane interface;
+* desktop three-zone interface;
+* Watch Together player + mini-player;
+* typing indicators;
+* persistent replies and emoji reactions;
+* mentions and unread indicators;
+* Pomodoro focus timer;
+* theme and notification preferences.
 
 Avatar X/Y movement is transient and intentionally not persisted to the audit database.
 
@@ -500,6 +523,7 @@ With both clients connected to the same self-hosted server, each should see the 
 | [PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md](PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md) | production architecture, API, presence, RBAC, test matrix, deployment acceptance criteria |
 | [PERFORMANCE-ADMIN-OPS-v4.2.md](PERFORMANCE-ADMIN-OPS-v4.2.md) | movement optimization, latency diagnostics, admin session/network operations |
 | [PRODUCTION-UI-UX-REDESIGN-v5.0.md](PRODUCTION-UI-UX-REDESIGN-v5.0.md) | production application shell, member UX, interpolated movement, admin control plane |
+| [RESPONSIVE-WATCH-TOGETHER-v6.0.md](RESPONSIVE-WATCH-TOGETHER-v6.0.md) | native mobile/tablet/desktop shell, Watch Together, richer chat, focus tools, admin live ops |
 | [CHANGELOG.md](CHANGELOG.md) | release history |
 
 ## CI validation
@@ -519,6 +543,7 @@ GitHub Actions uses Node.js 24 LTS and checks:
 * origin policy validation;
 * real two-session Socket.IO presence/RBAC test;
 * multi-client disconnect/reconnect/logout/restart integration test;
+* typing, availability, movement, reply/reaction and admin live-ops integration checks;
 * production Docker build.
 
 Run locally:
