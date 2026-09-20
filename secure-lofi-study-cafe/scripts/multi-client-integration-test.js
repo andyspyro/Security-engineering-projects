@@ -41,6 +41,7 @@ async function http(pathname, {
   method = "GET",
   cookie = "",
   csrfToken = "",
+  origin = "",
   body
 } = {}) {
   const headers = {
@@ -53,6 +54,10 @@ async function http(pathname, {
 
   if (csrfToken) {
     headers["X-CSRF-Token"] = csrfToken;
+  }
+
+  if (origin) {
+    headers.Origin = origin;
   }
 
   if (body !== undefined) {
@@ -305,6 +310,31 @@ async function main() {
     `Bunny admin API attempt should return 403, got ${bunnyAdminAttempt.response.status}.`
   );
 
+  const bunnyAdminPage = await http("/admin", {
+    cookie: bunny.cookie
+  });
+  assert(
+    bunnyAdminPage.response.status === 403,
+    `Bunny admin page attempt should return 403, got ${bunnyAdminPage.response.status}.`
+  );
+
+  const bunnySecurityPage = await http("/security", {
+    cookie: bunny.cookie
+  });
+  assert(
+    bunnySecurityPage.response.status === 403,
+    `Bunny security page attempt should return 403, got ${bunnySecurityPage.response.status}.`
+  );
+
+  const crossOriginAttempt = await http("/api/auth/me", {
+    cookie: bunny.cookie,
+    origin: "https://evil.example"
+  });
+  assert(
+    crossOriginAttempt.response.status === 403,
+    `Unapproved API origin should return 403, got ${crossOriginAttempt.response.status}.`
+  );
+
   const adminUsers = await http("/api/admin/users", {
     cookie: admin.cookie
   });
@@ -361,25 +391,54 @@ async function main() {
   const bunnySocketOne = await connectSocket(bunny);
   await bunnyAppears;
 
+  const bunnyTwoTabs = waitForEvent(
+    adminSocket,
+    "presence:update",
+    (payload) => {
+      if (!Array.isArray(payload.members)) {
+        return false;
+      }
+
+      const bunnyMembers = payload.members.filter(
+        (member) => member.username === bunnyUsername
+      );
+
+      return (
+        bunnyMembers.length === 1 &&
+        Number(bunnyMembers[0].connectionCount) >= 2
+      );
+    }
+  );
+
   const bunnySocketTwo = await connectSocket(bunny);
+  await bunnyTwoTabs;
 
   bunnySocketOne.disconnect();
 
   const bunnyStillOnline = await waitForEvent(
     adminSocket,
     "presence:update",
-    (payload) =>
-      Array.isArray(payload.members) &&
-      payload.members.some(
-        (member) =>
-          member.username === bunnyUsername &&
-          Number(member.connectionCount) >= 1
-      )
+    (payload) => {
+      if (!Array.isArray(payload.members)) {
+        return false;
+      }
+
+      const bunnyMembers = payload.members.filter(
+        (member) => member.username === bunnyUsername
+      );
+
+      return (
+        bunnyMembers.length === 1 &&
+        Number(bunnyMembers[0].connectionCount) === 1
+      );
+    }
   );
 
   assert(
-    bunnyStillOnline.members.some((member) => member.username === bunnyUsername),
-    "Closing one Bunny tab incorrectly marked Bunny offline."
+    bunnyStillOnline.members.filter(
+      (member) => member.username === bunnyUsername
+    ).length === 1,
+    "Multiple Bunny tabs created duplicate visible users."
   );
 
   const adminReceivesMessage = waitForEvent(
@@ -413,7 +472,7 @@ async function main() {
     "Realtime message was not persisted in SQLite."
   );
 
-  const bunnyLeaves = waitForEvent(
+  const bunnyLeavesAfterNetworkLoss = waitForEvent(
     adminSocket,
     "presence:update",
     (payload) =>
@@ -422,7 +481,44 @@ async function main() {
   );
 
   bunnySocketTwo.disconnect();
-  await bunnyLeaves;
+  await bunnyLeavesAfterNetworkLoss;
+
+  const bunnyReconnects = waitForEvent(
+    adminSocket,
+    "presence:update",
+    (payload) =>
+      Array.isArray(payload.members) &&
+      payload.members.some(
+        (member) =>
+          member.username === bunnyUsername &&
+          Number(member.connectionCount) === 1
+      )
+  );
+
+  const bunnySocketThree = await connectSocket(bunny);
+  await bunnyReconnects;
+
+  const bunnyLogoutPresence = waitForEvent(
+    adminSocket,
+    "presence:update",
+    (payload) =>
+      Array.isArray(payload.members) &&
+      !payload.members.some((member) => member.username === bunnyUsername)
+  );
+
+  const bunnyLogout = await http("/api/auth/logout", {
+    method: "POST",
+    cookie: bunny.cookie,
+    csrfToken: bunny.csrfToken
+  });
+
+  assert(
+    bunnyLogout.response.status === 204,
+    `Bunny logout should return 204, got ${bunnyLogout.response.status}.`
+  );
+
+  await bunnyLogoutPresence;
+  bunnySocketThree.disconnect();
 
   const stillRegistered = await http("/api/admin/users", {
     cookie: admin.cookie
@@ -464,12 +560,14 @@ async function main() {
   console.log("Verified:");
   console.log("- permanent admin and regular Bunny accounts");
   console.log("- Bunny receives user role");
-  console.log("- Bunny admin API request returns 403");
+  console.log("- Bunny admin page/API and security page return 403");
+  console.log("- unapproved API origin returns 403");
   console.log("- realtime cross-client presence");
-  console.log("- multiple-tab presence reference counting");
+  console.log("- multiple tabs collapse to one visible user with connection counting");
   console.log("- realtime cross-client chat");
   console.log("- persisted messages");
-  console.log("- offline transition after final socket disconnect");
+  console.log("- network-style disconnect and authenticated reconnect");
+  console.log("- explicit logout removes Bunny from live presence");
   console.log("- account/message persistence across server restart");
 }
 
