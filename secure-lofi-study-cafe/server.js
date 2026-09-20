@@ -1641,6 +1641,25 @@ app.post("/logout", verifyCsrf, async (req, res) => {
     }
   }
 
+  try {
+    const sockets = await io
+      .in(roomPresence.channel(DEFAULT_ROOM_ID))
+      .fetchSockets();
+
+    for (const socket of sockets) {
+      const socketUser =
+        socket.request &&
+        socket.request.session &&
+        socket.request.session.user;
+
+      if (user && socketUser && socketUser.id === user.id) {
+        socket.disconnect(true);
+      }
+    }
+  } catch (err) {
+    console.error("Logout socket cleanup error:", err);
+  }
+
   req.session.destroy(() => {
     res.redirect("/login");
   });
@@ -2894,20 +2913,35 @@ io.on("connection", async (socket) => {
     emitPresence();
   });
 
-  socket.on("member:avatar", (data) => {
-    const member = onlineUsers.get(user.id);
-    if (!member) {
-      return;
-    }
+  socket.on("member:avatar", async (data) => {
+    try {
+      const member = onlineUsers.get(user.id);
+      if (!member) {
+        return;
+      }
 
-    const requested = String((data && data.style) || "");
-    if (!AVATAR_STYLES.includes(requested)) {
-      return;
-    }
+      const requested = String((data && data.style) || "");
+      if (!AVATAR_STYLES.includes(requested)) {
+        return;
+      }
 
-    member.avatarStyle = requested;
-    member.updatedAt = Date.now();
-    emitPresence();
+      member.avatarStyle = requested;
+      member.updatedAt = Date.now();
+
+      await db.run(
+        `
+        UPDATE user_profiles
+        SET avatar_style = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+        `,
+        [requested, user.id]
+      );
+
+      emitPresence();
+    } catch (err) {
+      console.error("Avatar style update failed:", err);
+    }
   });
 
   socket.on("member:profile-image", async (data, acknowledge) => {
