@@ -4,6 +4,7 @@
   const body = document.body;
   const csrfToken = body.dataset.csrf;
   const currentUserId = Number(body.dataset.userId);
+  const roomId = Number(body.dataset.roomId || 1);
   const canModerate = body.dataset.canModerate === "true";
   const canAssign = body.dataset.canAssign === "true";
 
@@ -665,7 +666,8 @@
     }
 
     chatLog.appendChild(article);
-    chatLog.scrollTop = chatLog.scrollHeight;
+    loadInitialRoomMembers();
+  chatLog.scrollTop = chatLog.scrollHeight;
   }
 
   function estimatedControllerSeconds() {
@@ -1027,9 +1029,30 @@
       });
   }
 
+  async function loadInitialRoomMembers() {
+    try {
+      const response = await fetch(`/api/rooms/${roomId}/members`, {
+        headers: {
+          Accept: "application/json"
+        },
+        credentials: "same-origin"
+      });
+
+      if (!response.ok) {
+        throw new Error(`members API returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      renderMembers(payload.members || []);
+    } catch (error) {
+      console.error("Initial room member load failed:", error);
+    }
+  }
+
   socket.on("connect", () => {
     socketStatus.textContent = "Syncing";
     socketStatus.classList.remove("live");
+    loadInitialRoomMembers();
     requestAuthoritativeRoomState();
   });
 
@@ -1040,8 +1063,19 @@
 
   socket.on("connect_error", (error) => {
     console.error("Realtime connection failed:", error.message);
-    socketStatus.textContent = "Connection failed";
+    socketStatus.textContent =
+      error.message === "authentication required"
+        ? "Session expired"
+        : "Connection failed";
     socketStatus.classList.remove("live");
+  });
+
+  socket.on("session:expired", () => {
+    window.location.assign("/login");
+  });
+
+  socket.on("authorization:updated", () => {
+    window.location.reload();
   });
 
   socket.on("room:snapshot", (snapshot) => {
