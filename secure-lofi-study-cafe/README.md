@@ -35,6 +35,21 @@ This is the deployment where an administrator on one device and a normal user su
 
 The GitHub Pages build remains a static interface showcase only. It is not the authoritative multi-user backend.
 
+## Start a real public test immediately
+
+For the shortest free cross-device test, use the actual backend plus a temporary Cloudflare Quick Tunnel:
+
+```bash
+cd Security-engineering-projects/secure-lofi-study-cafe
+bash deploy/scripts/start-free-public-test.sh
+```
+
+The script starts the real Node/Express/Socket.IO backend and SQLite database, then prints a temporary public HTTPS URL. Use that exact URL on both the administrator computer and Bunny's phone.
+
+See [START-NOW.md](START-NOW.md).
+
+Cloudflare Quick Tunnels are for testing/development, not the final stable production endpoint. Use the named-tunnel or Caddy instructions in [SELF-HOSTING.md](SELF-HOSTING.md) for a stable public deployment.
+
 ## Quick start
 
 Recommended host:
@@ -409,6 +424,8 @@ With both clients connected to the same self-hosted server, each should see the 
 | [schema.sql](schema.sql) | documented SQLite schema and runtime pragmas |
 | [sql/security-forensics.sql](sql/security-forensics.sql) | incident-response SQL |
 | [deploy/README.md](deploy/README.md) | deployment asset map |
+| [deploy/scripts/start-free-public-test.sh](deploy/scripts/start-free-public-test.sh) | one-command real public multi-device test |
+| [START-NOW.md](START-NOW.md) | shortest path to a free public test URL |
 | [deploy/scripts/install-self-hosted.sh](deploy/scripts/install-self-hosted.sh) | interactive hardened installer |
 | [deploy/systemd/secure-lofi-study-cafe.service](deploy/systemd/secure-lofi-study-cafe.service) | systemd service sandbox |
 | [deploy/scripts/backup-sqlite.sh](deploy/scripts/backup-sqlite.sh) | online verified backups |
