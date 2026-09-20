@@ -1248,6 +1248,28 @@
     const current = state.currentTrack;
     nowPlayingTitle.textContent = current ? current.title : "Not playing";
 
+    if (mediaTitle) {
+      mediaTitle.textContent = current ? current.title : "No video playing";
+    }
+
+    if (mediaRequester) {
+      mediaRequester.textContent = current
+        ? "Requested by " + (current.requested_by_username || "unknown")
+        : "Requested by —";
+    }
+
+    if (mediaSyncState) {
+      mediaSyncState.textContent =
+        controllerState && controllerState.username
+          ? (controllerState.isPlaying ? "Playing" : "Paused") +
+            " · synced by " + controllerState.username
+          : "Waiting for room controller";
+      mediaSyncState.classList.toggle(
+        "live",
+        Boolean(controllerState && controllerState.username)
+      );
+    }
+
     if (requestedByLine) {
       requestedByLine.textContent = current
         ? `Requested by ${current.requested_by_username || "unknown"}`
@@ -1295,12 +1317,31 @@
       videoId: "",
       playerVars: {
         rel: 0,
-        modestbranding: 1
+        playsinline: 1,
+        autoplay: 0,
+        origin: window.location.origin
       },
       events: {
         onReady: () => {
           if (followingRoom) {
             syncPlayer();
+          }
+        },
+        onAutoplayBlocked: () => {
+          if (enablePlayback) {
+            enablePlayback.hidden = false;
+          }
+          if (mediaSyncState) {
+            mediaSyncState.textContent = "Tap to enable playback";
+            mediaSyncState.classList.remove("live");
+          }
+        },
+        onStateChange: (event) => {
+          if (
+            enablePlayback &&
+            event.data === YT.PlayerState.PLAYING
+          ) {
+            enablePlayback.hidden = true;
           }
         }
       }
@@ -1324,6 +1365,47 @@
     socket.emit("vote:next", { csrfToken });
   });
 
+  if (mediaSyncButton) {
+    mediaSyncButton.addEventListener("click", () => {
+      followingRoom = true;
+      syncPlayer();
+    });
+  }
+
+  if (mediaVoteButton) {
+    mediaVoteButton.addEventListener("click", () => {
+      socket.emit("vote:next", { csrfToken });
+    });
+  }
+
+  if (enablePlayback) {
+    enablePlayback.addEventListener("click", () => {
+      followingRoom = true;
+      enablePlayback.hidden = true;
+      syncPlayer();
+    });
+  }
+
+  if (mediaCollapse && mediaDock) {
+    const savedCollapsed =
+      localStorage.getItem("lofi.mediaCollapsed") === "true";
+    mediaDock.classList.toggle("is-collapsed", savedCollapsed);
+    mediaCollapse.setAttribute(
+      "aria-expanded",
+      savedCollapsed ? "false" : "true"
+    );
+    mediaCollapse.textContent = savedCollapsed ? "Expand" : "Mini";
+
+    mediaCollapse.addEventListener("click", () => {
+      const collapsed = mediaDock.classList.toggle("is-collapsed");
+      mediaCollapse.setAttribute(
+        "aria-expanded",
+        collapsed ? "false" : "true"
+      );
+      mediaCollapse.textContent = collapsed ? "Expand" : "Mini";
+      localStorage.setItem("lofi.mediaCollapsed", String(collapsed));
+    });
+  }
   if (minimizeChatButton && chatBody) {
     minimizeChatButton.addEventListener("click", () => {
       const minimized = chatBody.classList.toggle("is-minimized");
