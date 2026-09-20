@@ -172,6 +172,12 @@ async function connectSocket(session) {
     }
   });
 
+  const readyPromise = waitForEvent(
+    socket,
+    "room:ready",
+    (payload) => payload && payload.roomId === 1
+  );
+
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error("Socket connection timed out."));
@@ -188,6 +194,7 @@ async function connectSocket(session) {
     });
   });
 
+  await readyPromise;
   return socket;
 }
 
