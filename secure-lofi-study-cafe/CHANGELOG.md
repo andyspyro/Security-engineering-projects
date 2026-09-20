@@ -1,5 +1,45 @@
 # Changelog
 
+## 4.1.0 — Production Multi-User Backend
+
+### Shared backend
+
+* Added persistent `rooms`, `room_memberships`, `user_profiles`, and `presence_sessions` models.
+* Added stable database IDs as the authoritative user identity.
+* Added authenticated JSON APIs for auth, current user, rooms, membership, messages, and admin users/roles.
+* Added consistent JSON error responses and CSRF protection for state-changing API requests.
+
+### Realtime presence
+
+* Added dedicated `RoomPresence` service.
+* Tracks authenticated users by room and stable user ID.
+* Supports multiple active sockets/tabs per user without premature offline transitions.
+* Persists connect/heartbeat/disconnect/last-seen history.
+* Marks stale online socket records offline after process restart.
+* Added explicit room snapshot/reconnect synchronization.
+* Added idempotent member/message reconciliation on the frontend.
+
+### Realtime security
+
+* Engine.IO and Express use the same server-side session middleware.
+* Socket.IO rejects unauthenticated connections.
+* Added explicit allowed-origin policy for realtime handshakes.
+* Client-supplied usernames/roles are not trusted for socket identity.
+
+### RBAC
+
+* Formalized roles, permissions, and role-permission mappings in SQL.
+* Regular registration always produces the `user` role.
+* Admin APIs enforce server-side authorization and return 403 to regular users.
+* Bunny/regular-user privileged-page/API denial is covered by integration tests.
+
+### Verification
+
+* Added independent multi-client Socket.IO integration testing.
+* Tests duplicate tabs, reconnect, logout, persisted messages, restart persistence, and direct privileged API access.
+* Latest CI validates JavaScript, templates, shell deployment assets, security schema, realtime behavior, multi-client behavior, origin policy, and Docker build.
+* Added `PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md`.
+
 ## 4.0.1 — Realtime Presence Reliability
 
 ### Realtime
