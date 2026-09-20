@@ -34,6 +34,7 @@
       <a class="admin-command-link" href="#connected-users">Connected Users</a>
       <a class="admin-command-link" href="#sessions">Sessions</a>
       <a class="admin-command-link" href="#realtime">Realtime</a>
+      <a class="admin-command-link" href="#live-ops">Live Ops</a>
       <a class="admin-command-link" href="#moderation">Moderation</a>
       <a class="admin-command-link" href="#music-requests">Music Requests</a>
       <a class="admin-command-link" href="#audit-log">Audit Log</a>
@@ -48,11 +49,15 @@
       </article>
       <article class="admin-stat">
         <span>Online now</span>
-        <strong><%= counts.onlineUsers %></strong>
+        <strong id="admin-online-count"><%= counts.onlineUsers %></strong>
       </article>
       <article class="admin-stat">
         <span>Live sockets</span>
-        <strong><%= counts.activeSockets %></strong>
+        <strong id="admin-socket-count"><%= counts.activeSockets %></strong>
+      </article>
+      <article class="admin-stat">
+        <span>Realtime latency</span>
+        <strong id="admin-latency">—</strong>
       </article>
       <article class="admin-stat">
         <span>Active sessions</span>
@@ -339,6 +344,24 @@
       </div>
     </section>
 
+    <section id="live-ops" class="panel admin-section admin-anchor">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Live Operations</p>
+          <h2>Realtime Event Stream</h2>
+        </div>
+        <span id="admin-realtime-status" class="badge">Connecting</span>
+      </div>
+      <p class="compact">
+        This stream is delivered only to authenticated permanent-admin sockets. It shows
+        live connection, disconnect, chat, and reaction activity without exposing raw
+        passwords, session cookies, or authentication tokens.
+      </p>
+      <div id="admin-live-stream" class="admin-live-stream" aria-live="polite">
+        <div class="admin-live-empty">Waiting for live room activity…</div>
+      </div>
+    </section>
+
     <section id="security-events" class="panel admin-section admin-anchor" data-admin-section>
       <div class="panel-heading">
         <div>
@@ -521,6 +544,7 @@
     <div id="admin-user-inspector-content"></div>
   </dialog>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script src="/admin.js"></script>
 </body>
 </html>
