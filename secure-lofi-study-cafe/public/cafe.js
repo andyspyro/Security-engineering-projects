@@ -48,6 +48,11 @@
   let controllerState = null;
   let followingRoom = true;
 
+  const messageIds = new Set(
+    Array.from(
+      document.querySelectorAll("#chat-log [data-message-id]")
+    ).map((node) => String(node.dataset.messageId))
+  );
   const speechBubbles = new Map();
   const heldKeys = new Set();
   let heldPointerVector = null;
@@ -625,11 +630,21 @@
   }
 
   function appendMessage(message, system = false) {
+    const messageId =
+      !system && message && message.id
+        ? String(message.id)
+        : null;
+
+    if (messageId && messageIds.has(messageId)) {
+      return;
+    }
+
     const article = document.createElement("article");
     article.className = system ? "message system" : "message";
 
-    if (message.id) {
-      article.dataset.messageId = message.id;
+    if (messageId) {
+      article.dataset.messageId = messageId;
+      messageIds.add(messageId);
     }
 
     if (system) {
@@ -1048,10 +1063,39 @@
     }
   }
 
+  async function loadInitialRoomMessages() {
+    try {
+      const response = await fetch(
+        `/api/rooms/${roomId}/messages`,
+        {
+          headers: {
+            Accept: "application/json"
+          },
+          credentials: "same-origin"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `messages API returned ${response.status}`
+        );
+      }
+
+      const payload = await response.json();
+
+      for (const message of payload.messages || []) {
+        appendMessage(message);
+      }
+    } catch (error) {
+      console.error("Initial room message load failed:", error);
+    }
+  }
+
   socket.on("connect", () => {
     socketStatus.textContent = "Syncing";
     socketStatus.classList.remove("live");
     loadInitialRoomMembers();
+    loadInitialRoomMessages();
     requestAuthoritativeRoomState();
   });
 
@@ -1096,6 +1140,8 @@
     if (node) {
       node.remove();
     }
+
+    messageIds.delete(String(id));
   });
 
   socket.on("room:system", (message) => {
@@ -1222,5 +1268,6 @@
   }
 
   loadInitialRoomMembers();
+  loadInitialRoomMessages();
   chatLog.scrollTop = chatLog.scrollHeight;
 })();
