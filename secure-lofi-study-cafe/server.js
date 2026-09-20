@@ -25,11 +25,38 @@ if (TRUST_PROXY) {
   app.set("trust proxy", "loopback");
 }
 
+const originPolicy = createOriginPolicy({
+  publicOrigin: process.env.PUBLIC_ORIGIN,
+  allowedOrigins: process.env.ALLOWED_ORIGINS
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   pingInterval: 25000,
   pingTimeout: 20000,
-  transports: ["websocket", "polling"]
+  transports: ["websocket", "polling"],
+  allowRequest: (req, callback) => {
+    const allowed = originPolicy.isAllowed(
+      req.headers.origin,
+      req.headers.host
+    );
+    callback(null, allowed);
+  },
+  cors: {
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        originPolicy.configuredOrigins.size === 0 ||
+        originPolicy.isConfigured(origin)
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("origin not allowed"));
+    },
+    credentials: true
+  }
 });
 
 const PORT = Number(process.env.PORT || 3000);
@@ -39,11 +66,6 @@ const SESSION_SECRET = process.env.SESSION_SECRET;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const DEFAULT_ROOM_ID = db.DEFAULT_ROOM_ID || 1;
-
-const originPolicy = createOriginPolicy({
-  publicOrigin: process.env.PUBLIC_ORIGIN,
-  allowedOrigins: process.env.ALLOWED_ORIGINS
-});
 
 if (!SESSION_SECRET) {
   throw new Error("SESSION_SECRET is required. Copy .env.example to .env and set a random value.");
