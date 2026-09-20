@@ -67,6 +67,7 @@ jobs:
       - name: Check self-host deployment shell scripts
         run: |
           bash -n deploy/scripts/install-self-hosted.sh
+          bash -n deploy/scripts/start-free-public-test.sh
           bash -n deploy/scripts/backup-sqlite.sh
           bash -n deploy/scripts/restore-sqlite.sh
           bash -n deploy/scripts/healthcheck.sh
