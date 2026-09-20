@@ -1,15 +1,15 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 4.2.0  
+> **Release:** 5.0.0  
 > **Type:** self-hosted secure realtime web application  
 > **Runtime:** Node.js 24 LTS, Express, EJS, Socket.IO  
 > **Persistence:** self-hosted SQLite in WAL mode  
 > **Service manager:** systemd  
 > **Security focus:** authentication, RBAC, CSRF, session security, host hardening, SQL telemetry, audit logging, backups, incident reconstruction
 
-## What changed in v4.2
+## What changed in v5.0
 
-Version 4.2 keeps the production multi-user architecture and improves realtime movement performance, network diagnostics, security telemetry, and permanent-admin operations.
+Version 5.0 keeps the production multi-user architecture and redesigns the application into a responsive three-panel product interface with a larger interactive café, interpolated remote movement, room-safe member profiles, server-authoritative availability statuses, a dedicated chat rail, clearer music workflows, and a navigable administrator control plane.
 
 The full application is designed to run on a Linux machine you control:
 
@@ -34,6 +34,26 @@ your server
 This is the deployment where an administrator on one device and a normal user such as `bunny` on another device use the same account database, room presence, chat, moderation state, and security logs.
 
 The GitHub Pages build remains a static interface showcase only. It is not the authoritative multi-user backend.
+
+## v5.0 product UI
+
+Desktop now uses a responsive application shell:
+
+```text
+Left rail       Main experience           Right rail
+Room nav        Large Café Floor          Members
+Profile         Shared music              Realtime chat
+Status
+Connection
+```
+
+The layout stacks appropriately on tablets/phones instead of compressing the interface into a narrow centered column.
+
+Realtime remote movement now interpolates between server-accepted coordinates on `requestAnimationFrame`, while the backend remains authoritative for shared presence. Users can set Studying, Available to chat, Do not disturb, or AFK; the server validates, persists, and rebroadcasts the selected status.
+
+Normal member cards expose room-safe information only. The permanent-admin console keeps IP/session/runtime/security telemetry separated behind server-side authorization.
+
+See [PRODUCTION-UI-UX-REDESIGN-v5.0.md](PRODUCTION-UI-UX-REDESIGN-v5.0.md).
 
 ## Hosting command
 
@@ -479,6 +499,7 @@ With both clients connected to the same self-hosted server, each should see the 
 | [REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md](REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md) | realtime root cause and first two-session repair |
 | [PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md](PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md) | production architecture, API, presence, RBAC, test matrix, deployment acceptance criteria |
 | [PERFORMANCE-ADMIN-OPS-v4.2.md](PERFORMANCE-ADMIN-OPS-v4.2.md) | movement optimization, latency diagnostics, admin session/network operations |
+| [PRODUCTION-UI-UX-REDESIGN-v5.0.md](PRODUCTION-UI-UX-REDESIGN-v5.0.md) | production application shell, member UX, interpolated movement, admin control plane |
 | [CHANGELOG.md](CHANGELOG.md) | release history |
 
 ## CI validation
