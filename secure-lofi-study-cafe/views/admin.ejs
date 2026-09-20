@@ -35,6 +35,22 @@
         <strong><%= counts.users %></strong>
       </article>
       <article class="admin-stat">
+        <span>Online now</span>
+        <strong><%= counts.onlineUsers %></strong>
+      </article>
+      <article class="admin-stat">
+        <span>Live sockets</span>
+        <strong><%= counts.activeSockets %></strong>
+      </article>
+      <article class="admin-stat">
+        <span>Active sessions</span>
+        <strong><%= counts.activeSessions %></strong>
+      </article>
+      <article class="admin-stat">
+        <span>Failed logins · 24h</span>
+        <strong><%= counts.failedLogins24h %></strong>
+      </article>
+      <article class="admin-stat">
         <span>Audit events</span>
         <strong><%= counts.auditEvents %></strong>
       </article>
@@ -74,13 +90,70 @@
       <p>
         The console records activity generated inside this application: usernames, roles,
         account timestamps, chat content, moderation history, music requests, queue actions,
-        authentication events, votes, and privileged actions.
+        authentication events, votes, privileged actions, client IP addresses, and browser
+        user-agent strings needed for security investigation.
       </p>
       <p class="compact">
-        It intentionally does not expose passwords or password hashes, session cookies,
-        authentication tokens, browser history, precise location, unrelated device data,
-        or hidden device fingerprints.
+        It intentionally does not expose passwords or password hashes, raw session cookies,
+        authentication tokens, browser history, precise geolocation, unrelated device data,
+        or hidden device fingerprints. Session identifiers are represented only by a keyed,
+        non-reversible correlation reference.
       </p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Current Admin Request</p>
+          <h2>Session & Cookie Security</h2>
+        </div>
+        <span class="badge live">safe metadata only</span>
+      </div>
+
+      <div class="admin-session-grid">
+        <article class="admin-session-card">
+          <p><strong>Client IP</strong></p>
+          <code><%= requestContext.clientIp %></code>
+          <p><strong>Session reference</strong></p>
+          <code><%= requestContext.sessionRef %></code>
+          <p class="admin-small">The raw session cookie value is never displayed.</p>
+        </article>
+
+        <article class="admin-session-card">
+          <p><strong>Cookie</strong> <code><%= requestContext.cookie.name %></code></p>
+          <p>HttpOnly: <strong><%= requestContext.cookie.httpOnly ? "yes" : "no" %></strong></p>
+          <p>Secure: <strong><%= requestContext.cookie.secure ? "yes" : "no" %></strong></p>
+          <p>SameSite: <strong><%= requestContext.cookie.sameSite %></strong></p>
+          <p>Max age: <strong><%= requestContext.cookie.maxAgeMinutes %> minutes</strong></p>
+          <p>Expires: <strong><%= requestContext.cookie.expiresAt || "session-managed" %></strong></p>
+        </article>
+      </div>
+
+      <p class="admin-user-agent">
+        <strong>User agent:</strong> <%= requestContext.userAgent %>
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Server Operations</p>
+          <h2>Runtime Health</h2>
+        </div>
+        <span class="badge live">running</span>
+      </div>
+
+      <div class="admin-runtime-grid">
+        <article class="admin-runtime-card"><span>Node</span><strong><%= runtime.nodeVersion %></strong></article>
+        <article class="admin-runtime-card"><span>Uptime</span><strong><%= Math.floor(runtime.uptimeSeconds / 60) %> min</strong></article>
+        <article class="admin-runtime-card"><span>Memory RSS</span><strong><%= runtime.rssMb %> MB</strong></article>
+        <article class="admin-runtime-card"><span>SQLite journal</span><strong><%= runtime.journalMode %></strong></article>
+        <article class="admin-runtime-card"><span>Listen address</span><code><%= runtime.host %>:<%= runtime.port %></code></article>
+        <article class="admin-runtime-card"><span>Trusted proxy</span><strong><%= runtime.trustProxy ? "loopback only" : "disabled" %></strong></article>
+        <article class="admin-runtime-card"><span>Public origin</span><code><%= runtime.publicOrigin %></code></article>
+        <article class="admin-runtime-card"><span>Database</span><code><%= runtime.databasePath %></code></article>
+        <article class="admin-runtime-card"><span>Process ID</span><strong><%= runtime.pid %></strong></article>
+      </div>
     </section>
 
     <section class="panel">
@@ -111,8 +184,13 @@
             <tr>
               <th>User</th>
               <th>Role</th>
+              <th>Presence</th>
+              <th>Last seen</th>
+              <th>Latest IP</th>
+              <th>Client</th>
               <th>Registered</th>
               <th>Messages</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -120,8 +198,111 @@
               <tr data-admin-row>
                 <td><strong><%= account.username %></strong></td>
                 <td><%= account.role %></td>
+                <td>
+                  <% if (account.online) { %>
+                    <span class="badge live">online</span>
+                    <div class="admin-small"><%= account.connection_count %> socket<%= account.connection_count === 1 ? "" : "s" %></div>
+                  <% } else { %>
+                    <span class="badge">offline</span>
+                  <% } %>
+                </td>
+                <td><%= account.last_seen_at || "—" %></td>
+                <td><code><%= account.latest_ip || "—" %></code></td>
+                <td class="admin-user-agent"><%= account.latest_user_agent || "—" %></td>
                 <td><%= account.created_at %></td>
                 <td><%= account.message_count %></td>
+                <td>
+                  <% if (account.id !== user.id) { %>
+                    <form method="post" action="/admin/users/<%= account.id %>/revoke-sessions">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button class="button danger small" type="submit">Revoke Sessions</button>
+                    </form>
+                  <% } else { %>
+                    <span class="admin-small">current admin</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel admin-section" data-admin-section>
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Authenticated Sessions</p>
+          <h2>Active Server Sessions</h2>
+        </div>
+        <span class="badge"><%= activeSessions.length %> active</span>
+      </div>
+
+      <p class="compact">
+        Raw session IDs and raw cookies are never displayed. The reference below is an HMAC-derived
+        correlation value that lets you connect session activity across security events without
+        exposing the authentication credential.
+      </p>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Session ref</th>
+              <th>Updated</th>
+              <th>Expires</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% activeSessions.forEach((session) => { %>
+              <tr data-admin-row>
+                <td><strong><%= session.username %></strong></td>
+                <td><%= session.role %></td>
+                <td><code><%= session.sessionRef %></code></td>
+                <td><%= session.updatedAt %></td>
+                <td><%= new Date(session.expiresAt).toISOString() %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel admin-section" data-admin-section>
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Connection History</p>
+          <h2>Realtime Presence Sessions</h2>
+        </div>
+        <span class="badge"><%= presenceHistory.length %> recent</span>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Room</th>
+              <th>Status</th>
+              <th>Socket ref</th>
+              <th>Connected</th>
+              <th>Last seen</th>
+              <th>Disconnected</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% presenceHistory.forEach((presence) => { %>
+              <tr data-admin-row>
+                <td><strong><%= presence.username %></strong></td>
+                <td><%= presence.role %></td>
+                <td><%= presence.room_name %></td>
+                <td><span class="badge <%= presence.status === "online" ? "live" : "" %>"><%= presence.status %></span></td>
+                <td><code><%= presence.socket_ref %></code></td>
+                <td><%= presence.connected_at %></td>
+                <td><%= presence.last_seen_at %></td>
+                <td><%= presence.disconnected_at || "—" %></td>
               </tr>
             <% }) %>
           </tbody>
@@ -156,6 +337,8 @@
               <th>HTTP / Route</th>
               <th>Request</th>
               <th>Session ref</th>
+              <th>IP</th>
+              <th>Client</th>
               <th>Metadata</th>
             </tr>
           </thead>
@@ -170,6 +353,8 @@
                 <td><%= entry.http_method || "—" %> <%= entry.route || "—" %></td>
                 <td><code><%= entry.request_id || "—" %></code></td>
                 <td><code><%= entry.session_ref || "—" %></code></td>
+                <td><code><%= entry.client_ip || "—" %></code></td>
+                <td class="admin-user-agent"><%= entry.user_agent || "—" %></td>
                 <td class="admin-details"><%= entry.metadata || "—" %></td>
               </tr>
             <% }) %>
