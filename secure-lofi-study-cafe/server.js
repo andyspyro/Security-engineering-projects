@@ -1339,6 +1339,26 @@ function updateMemberStatus(userId, updates) {
 }
 
 /* -------------------------
+   Production JSON API
+------------------------- */
+
+app.use(
+  "/api",
+  createApiRouter({
+    db,
+    io,
+    presence: roomPresence,
+    defaultRoomId: DEFAULT_ROOM_ID,
+    adminUsername: ADMIN_USERNAME,
+    censorBadWords,
+    writeAudit,
+    writeSecurityEvent,
+    makeSessionRef,
+    authLimiter
+  })
+);
+
+/* -------------------------
    Routes
 ------------------------- */
 
