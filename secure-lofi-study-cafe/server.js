@@ -3163,6 +3163,18 @@ io.on("connection", async (socket) => {
 
   await addSocketToPresence(socket, user);
 
+  if (user.role === "admin") {
+    socket.join("admin:ops");
+  }
+
+  io.to("admin:ops").emit("admin:activity", {
+    type: "presence.connect",
+    severity: "INFO",
+    username: user.username,
+    message: user.username + " connected to the realtime service.",
+    createdAt: new Date().toISOString()
+  });
+
   const sessionValidationTimer = setInterval(async () => {
     try {
       const storedSession = await db.get(
@@ -3330,6 +3342,14 @@ io.on("connection", async (socket) => {
         "chat:new",
         savedMessage
       );
+
+      io.to("admin:ops").emit("admin:activity", {
+        type: "chat.message",
+        severity: "INFO",
+        username: user.username,
+        message: user.username + " sent message #" + result.lastID + ".",
+        createdAt: new Date().toISOString()
+      });
     } catch (err) {
       console.error("Live chat error:", err);
     }
@@ -3429,6 +3449,15 @@ io.on("connection", async (socket) => {
           reactions
         }
       );
+
+      io.to("admin:ops").emit("admin:activity", {
+        type: "chat.reaction",
+        severity: "INFO",
+        username: user.username,
+        message:
+          user.username + " updated a reaction on message #" + messageId + ".",
+        createdAt: new Date().toISOString()
+      });
 
       reply({ ok: true, reactions });
     } catch (err) {
@@ -3718,6 +3747,14 @@ io.on("connection", async (socket) => {
 
   socket.on("disconnect", (reason) => {
     clearInterval(sessionValidationTimer);
+
+    io.to("admin:ops").emit("admin:activity", {
+      type: "presence.disconnect",
+      severity: "NOTICE",
+      username: user.username,
+      message: user.username + " disconnected: " + String(reason || "unknown"),
+      createdAt: new Date().toISOString()
+    });
 
     removeSocketFromPresence(socket, user)
       .catch((err) => console.error("Presence disconnect error:", err));
