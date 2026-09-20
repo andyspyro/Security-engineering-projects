@@ -3,18 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#120b0a">
   <title>Secure Lo-Fi Study Cafe</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body
+  class="cafe-app"
   data-csrf="<%= csrfToken %>"
   data-user-id="<%= currentUserId %>"
   data-room-id="<%= roomId %>"
   data-can-moderate="<%= canModerate %>"
   data-can-assign="<%= canAssignTempAdmin %>"
 >
-  <header class="topbar">
-    <div class="brand-lockup">
+  <header class="topbar app-topbar">
+    <a class="brand-lockup brand-link" href="#cafe-floor" aria-label="Secure Lo-Fi Study Café home">
       <div class="coffee-mark" aria-hidden="true">
         <span class="steam steam-one"></span>
         <span class="steam steam-two"></span>
@@ -24,13 +26,20 @@
       <div>
         <p class="eyebrow">Secure Study Room</p>
         <h1>Secure Lo-Fi Study Café</h1>
-      <p class="session-line">Logged in as <strong><%= user.username %></strong> &nbsp;|&nbsp; Role: <strong><%= user.role %></strong></p>
+        <p class="session-line">
+          <span class="status-dot online" aria-hidden="true"></span>
+          <strong><%= user.username %></strong>
+          <span class="topbar-divider" aria-hidden="true">•</span>
+          <span><%= user.role %></span>
+        </p>
       </div>
-    </div>
+    </a>
 
     <div class="topbar-actions">
+      <a class="button ghost small" href="#music">Music</a>
+      <a class="button ghost small" href="#study-chat">Chat</a>
       <% if (canAssignTempAdmin) { %>
-        <a class="button secondary small" href="/security">Security Engineering</a>
+        <a class="button secondary small" href="/security">Security</a>
         <a class="button primary small" href="/admin">Admin Console</a>
       <% } %>
       <form method="post" action="/logout">
@@ -40,132 +49,132 @@
     </div>
   </header>
 
-  <main class="cafe-grid">
-    <div class="player-column">
-      <section class="panel">
-        <div class="panel-heading">
+  <div class="app-frame">
+    <aside class="app-sidebar" aria-label="Room navigation and profile">
+      <section class="sidebar-card room-summary-card">
+        <p class="eyebrow">Current room</p>
+        <div class="room-summary-title">
           <div>
-            <p class="eyebrow">Shared Player</p>
-            <h2>Lo-Fi Study Music</h2>
+            <h2>Main Study Café</h2>
+            <p>Shared realtime room</p>
           </div>
-          <span id="controller-badge" class="badge">Synced Room</span>
+          <span class="badge live"><span id="floor-member-count">0</span> online</span>
         </div>
 
-        <div class="player-meta">
-          <div>Room Track: <strong id="now-playing-title">Not playing</strong></div>
-          <div id="requested-by-line">Requested by —</div>
-          <div id="controller-line">Room controller: waiting for room state.</div>
-          <div id="player-status" class="controller-message">Syncing with the room controller…</div>
-        </div>
-
-        <div id="player" class="player-frame" aria-label="Shared YouTube player"></div>
-
-        <div class="player-actions">
-          <button id="sync-button" class="button primary" type="button">Sync to Controller</button>
-          <button id="independent-button" class="button secondary" type="button">Listen Independently</button>
-          <button id="vote-button" class="button secondary" type="button">Vote Next</button>
-
-          <% if (canModerate) { %>
-            <form method="post" action="/admin/player/next">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button class="button secondary" type="submit">Admin Play Next</button>
-            </form>
+        <nav class="app-nav" aria-label="Room navigation">
+          <a class="app-nav-link active" href="#cafe-floor">
+            <span aria-hidden="true">⌂</span>
+            <span>Café Floor</span>
+          </a>
+          <a class="app-nav-link" href="#music">
+            <span aria-hidden="true">♫</span>
+            <span>Shared Music</span>
+          </a>
+          <a class="app-nav-link" href="#study-chat">
+            <span aria-hidden="true">◌</span>
+            <span>Study Chat</span>
+          </a>
+          <a class="app-nav-link" href="#profile">
+            <span aria-hidden="true">☺</span>
+            <span>Profile</span>
+          </a>
+          <% if (canAssignTempAdmin) { %>
+            <a class="app-nav-link admin-nav-link" href="/admin">
+              <span aria-hidden="true">⚙</span>
+              <span>Admin Console</span>
+            </a>
           <% } %>
-        </div>
-
-        <p class="compact">Vote next: <span id="vote-count">0/1</span> needed. Members online: <span id="inline-member-count">0</span>.</p>
-        <p class="compact">If the browser pauses while you switch apps, the room will automatically sync back when you return.</p>
-
-        <div class="section-rule"></div>
-
-        <h3>Shared Playlist</h3>
-        <p class="compact">Everyone sees this queue. Admin/mod can rearrange it.</p>
-        <div id="queue-list" class="list-stack">
-          <p class="muted">Queue is loading…</p>
-        </div>
-
-        <div class="section-rule"></div>
-
-        <h3>Request Music</h3>
-        <p class="compact">Paste a YouTube video link. An admin must approve it before it plays.</p>
-        <form method="post" action="/music-requests" class="request-form">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-
-          <label>
-            Track title
-            <input name="title" maxlength="100" placeholder="Track title" required>
-          </label>
-
-          <label>
-            YouTube URL or embed
-            <input name="url" maxlength="1500" placeholder="https://www.youtube.com/watch?v=…" required>
-          </label>
-
-          <div>
-            <button class="button primary" type="submit">Request Song</button>
-          </div>
-        </form>
-
-        <div class="section-rule"></div>
-
-        <details>
-          <summary>Last Played</summary>
-          <div id="history-list" class="list-stack" style="margin-top:.8rem">
-            <p class="muted">History is loading…</p>
-          </div>
-        </details>
-
-        <% if (canModerate) { %>
-          <div class="section-rule"></div>
-          <details open>
-            <summary>Pending Music Requests</summary>
-            <div id="pending-list" class="list-stack" style="margin-top:.8rem">
-              <p class="muted">Pending requests are loading…</p>
-            </div>
-          </details>
-        <% } %>
+        </nav>
       </section>
-    </div>
 
-    <div class="chat-column">
-      <section class="panel cafe-floor-panel">
+      <section id="profile" class="sidebar-card profile-card">
+        <div class="sidebar-heading">
+          <div>
+            <p class="eyebrow">Your presence</p>
+            <h2><%= user.username %></h2>
+          </div>
+          <span class="badge <%= user.role === "admin" ? "admin" : "user" %>"><%= user.role %></span>
+        </div>
+
+        <label class="field-label" for="availability-status">Room status</label>
+        <select id="availability-status" class="status-select">
+          <option value="studying">Studying</option>
+          <option value="chat">Available to chat</option>
+          <option value="dnd">Do not disturb</option>
+          <option value="afk">AFK</option>
+        </select>
+        <p id="availability-status-note" class="compact">Your status is shared with people in this room.</p>
+
+        <div class="section-rule"></div>
+
+        <p class="field-label">Avatar style</p>
+        <div class="avatar-style-picker" aria-label="Choose avatar color">
+          <button class="avatar-swatch avatar-latte" data-avatar-style="latte" type="button" aria-label="Latte avatar"></button>
+          <button class="avatar-swatch avatar-mocha" data-avatar-style="mocha" type="button" aria-label="Mocha avatar"></button>
+          <button class="avatar-swatch avatar-matcha" data-avatar-style="matcha" type="button" aria-label="Matcha avatar"></button>
+          <button class="avatar-swatch avatar-berry" data-avatar-style="berry" type="button" aria-label="Berry avatar"></button>
+          <button class="avatar-swatch avatar-sky" data-avatar-style="sky" type="button" aria-label="Sky avatar"></button>
+          <button class="avatar-swatch avatar-lavender" data-avatar-style="lavender" type="button" aria-label="Lavender avatar"></button>
+        </div>
+
+        <div class="profile-photo-controls">
+          <input id="profile-image-input" class="sr-only" type="file" accept="image/png,image/jpeg,image/webp">
+          <label class="button secondary small" for="profile-image-input">Upload photo</label>
+          <button id="remove-profile-image" class="button ghost small" type="button">Remove</button>
+        </div>
+        <p id="profile-image-status" class="compact" aria-live="polite"></p>
+      </section>
+
+      <section class="sidebar-card connection-card">
+        <div class="sidebar-heading">
+          <div>
+            <p class="eyebrow">Connection</p>
+            <h2>Realtime status</h2>
+          </div>
+        </div>
+        <div class="connection-readout">
+          <span id="socket-status" class="badge live">Connecting</span>
+          <span id="latency-status" class="badge">Latency —</span>
+        </div>
+        <p class="compact">Room state is synchronized through the authenticated backend.</p>
+      </section>
+    </aside>
+
+    <main class="app-main">
+      <section id="cafe-floor" class="panel cafe-floor-panel room-hero">
         <div class="panel-heading floor-heading">
           <div>
-            <p class="eyebrow">Cozy Corner</p>
+            <p class="eyebrow">Live Room</p>
             <h2>Café Floor</h2>
-            <p class="compact">Move your avatar around the room. New members appear here automatically.</p>
+            <p class="panel-lead">Walk around, see who is here, and open a member card by selecting an avatar.</p>
           </div>
-          <span class="badge live"><span id="floor-member-count">0</span> here</span>
+          <div class="floor-meta">
+            <span class="badge live">Connected</span>
+            <span class="badge"><span id="inline-member-count">0</span> in room</span>
+          </div>
         </div>
 
-        <div id="avatar-stage" class="avatar-stage" tabindex="0" aria-label="Interactive café floor. Hold arrow keys or WASD to walk, or click a destination.">
+        <div
+          id="avatar-stage"
+          class="avatar-stage"
+          tabindex="0"
+          aria-label="Interactive café floor. Hold arrow keys or WASD to walk, or click a destination."
+        >
           <div class="cafe-window" aria-hidden="true"><span class="window-moon"></span></div>
           <div class="floor-lamp floor-lamp-left" aria-hidden="true"></div>
           <div class="floor-lamp floor-lamp-right" aria-hidden="true"></div>
           <div class="cafe-table cafe-table-one" aria-hidden="true"><span>☕</span></div>
           <div class="cafe-table cafe-table-two" aria-hidden="true"><span>📚</span></div>
           <div class="cafe-rug" aria-hidden="true"></div>
+          <div class="study-zone study-zone-focus" aria-hidden="true"><span>Focus</span></div>
+          <div class="study-zone study-zone-social" aria-hidden="true"><span>Chat</span></div>
           <div id="avatar-layer" class="avatar-layer"></div>
         </div>
 
-        <div class="avatar-toolbar">
-          <div class="avatar-personalize">
-            <div class="avatar-style-picker" aria-label="Choose avatar color">
-              <span class="compact">Your avatar</span>
-              <button class="avatar-swatch avatar-latte" data-avatar-style="latte" type="button" aria-label="Latte avatar"></button>
-              <button class="avatar-swatch avatar-mocha" data-avatar-style="mocha" type="button" aria-label="Mocha avatar"></button>
-              <button class="avatar-swatch avatar-matcha" data-avatar-style="matcha" type="button" aria-label="Matcha avatar"></button>
-              <button class="avatar-swatch avatar-berry" data-avatar-style="berry" type="button" aria-label="Berry avatar"></button>
-              <button class="avatar-swatch avatar-sky" data-avatar-style="sky" type="button" aria-label="Sky avatar"></button>
-              <button class="avatar-swatch avatar-lavender" data-avatar-style="lavender" type="button" aria-label="Lavender avatar"></button>
-            </div>
-
-            <div class="profile-photo-controls">
-              <input id="profile-image-input" class="sr-only" type="file" accept="image/png,image/jpeg,image/webp">
-              <label class="button secondary small" for="profile-image-input">Upload profile picture</label>
-              <button id="remove-profile-image" class="button ghost small" type="button">Remove picture</button>
-              <span id="profile-image-status" class="compact" aria-live="polite"></span>
-            </div>
+        <div class="floor-controls">
+          <div class="floor-help">
+            <strong>Move</strong>
+            <span>WASD / arrow keys / click a destination</span>
           </div>
 
           <div class="avatar-move-controls" aria-label="Move avatar">
@@ -179,62 +188,174 @@
         </div>
       </section>
 
-      <section class="panel chat-panel">
+      <section id="music" class="panel music-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Live Room</p>
-            <h2>Study Chat</h2>
+            <p class="eyebrow">Shared Music</p>
+            <h2>Room Player</h2>
+            <p class="panel-lead">Everyone can follow the shared room playback. Queue management remains permission-aware.</p>
+          </div>
+          <span id="controller-badge" class="badge">Synced Room</span>
+        </div>
+
+        <div class="music-layout">
+          <div class="music-player-column">
+            <div class="now-playing-card">
+              <div class="now-playing-icon" aria-hidden="true">♫</div>
+              <div class="player-meta">
+                <span class="mini-label">Now playing</span>
+                <strong id="now-playing-title">Not playing</strong>
+                <span id="requested-by-line">Requested by —</span>
+                <span id="controller-line">Room controller: waiting for room state.</span>
+                <span id="player-status" class="controller-message">Syncing with the room controller…</span>
+              </div>
+            </div>
+
+            <div id="player" class="player-frame" aria-label="Shared YouTube player"></div>
+
+            <div class="player-actions user-actions">
+              <button id="sync-button" class="button primary" type="button">Sync to Room</button>
+              <button id="independent-button" class="button secondary" type="button">Listen Independently</button>
+              <button id="vote-button" class="button secondary" type="button">Vote Next</button>
+            </div>
+
+            <div class="player-summary-row">
+              <span>Votes: <strong id="vote-count">0/1</strong></span>
+              <span>Room members: <strong><span id="inline-member-count-mirror" aria-hidden="true">live</span></strong></span>
+            </div>
+
+            <% if (canModerate) { %>
+              <details class="moderator-tools">
+                <summary>Moderator music controls</summary>
+                <div class="moderator-tool-body">
+                  <form method="post" action="/admin/player/next">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="button secondary" type="submit">Play Next Track</button>
+                  </form>
+                  <p class="compact">Approval, rejection, reordering, and removal tools are shown only to authorized moderators.</p>
+                </div>
+              </details>
+            <% } %>
           </div>
 
-          <div class="chat-toolbar">
-            <span id="socket-status" class="badge live">Connecting</span>
-            <span id="latency-status" class="badge">Latency —</span>
-            <button id="minimize-chat" class="button secondary small" type="button">Minimize Chat</button>
+          <div class="music-queue-column">
+            <div class="subsection-heading">
+              <div>
+                <p class="eyebrow">Up next</p>
+                <h3>Shared Playlist</h3>
+              </div>
+            </div>
+            <div id="queue-list" class="list-stack queue-scroll">
+              <p class="muted">Queue is loading…</p>
+            </div>
+
+            <details class="request-drawer">
+              <summary>Request a song</summary>
+              <form method="post" action="/music-requests" class="request-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <label>
+                  Track title
+                  <input name="title" maxlength="100" placeholder="Track title" required>
+                </label>
+                <label>
+                  YouTube URL or embed
+                  <input name="url" maxlength="1500" placeholder="https://www.youtube.com/watch?v=…" required>
+                </label>
+                <button class="button primary" type="submit">Submit Request</button>
+              </form>
+            </details>
+
+            <details>
+              <summary>Recently played</summary>
+              <div id="history-list" class="list-stack compact-list">
+                <p class="muted">History is loading…</p>
+              </div>
+            </details>
+
+            <% if (canModerate) { %>
+              <details open class="moderator-tools">
+                <summary>Pending requests</summary>
+                <div id="pending-list" class="list-stack compact-list">
+                  <p class="muted">Pending requests are loading…</p>
+                </div>
+              </details>
+            <% } %>
           </div>
+        </div>
+      </section>
+    </main>
+
+    <aside id="study-chat" class="app-right-rail" aria-label="Chat and online members">
+      <section class="panel members-panel">
+        <div class="panel-heading compact-heading">
+          <div>
+            <p class="eyebrow">Presence</p>
+            <h2>Members</h2>
+          </div>
+          <span id="member-count" class="badge">0 online</span>
+        </div>
+        <div id="members-list" class="members-list">
+          <div class="skeleton-row" aria-hidden="true"></div>
+          <div class="skeleton-row" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="panel chat-panel">
+        <div class="panel-heading compact-heading">
+          <div>
+            <p class="eyebrow">Realtime</p>
+            <h2>Study Chat</h2>
+          </div>
+          <button id="minimize-chat" class="button ghost small" type="button">Minimize</button>
         </div>
 
         <div id="chat-body" class="chat-body">
-          <div class="section-rule"></div>
-
-          <section class="member-section">
-            <h3>Members in Room</h3>
-            <div id="members-list" class="list-stack">
-              <p class="muted">Loading members…</p>
-            </div>
-            <span id="member-count" class="sr-only">0 online</span>
-          </section>
-
-          <form id="chat-form" class="chat-form">
-            <label class="sr-only" for="chat-input">Study message</label>
-            <input id="chat-input" maxlength="500" autocomplete="off" placeholder="Type a study message…" required>
-            <button class="button primary" type="submit">Send</button>
-          </form>
-
-          <p class="compact">Regular-user messages are censored in the live room. For moderation and accountability, submitted chat text and application activity may be retained in the permanent-admin audit log.</p>
-
-          <div id="chat-log" class="chat-log" aria-live="polite" style="margin-top:1rem">
+          <div id="chat-log" class="chat-log" aria-live="polite">
             <% [...messages].reverse().forEach((message) => { %>
               <article class="message" data-message-id="<%= message.id %>">
                 <div class="message-meta">
-                  <strong><%= message.username %></strong>
+                  <div class="message-author">
+                    <span class="message-avatar" aria-hidden="true"><%= message.username.slice(0, 1).toUpperCase() %></span>
+                    <strong><%= message.username %></strong>
+                  </div>
                   <span><%= new Date(message.created_at).toLocaleString() %></span>
                 </div>
 
                 <p><%= message.message_text %></p>
 
                 <% if (canModerate) { %>
-                  <form method="post" action="/admin/messages/<%= message.id %>/delete" class="inline-form">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button class="button danger" type="submit">Delete</button>
-                  </form>
+                  <details class="message-action-menu">
+                    <summary aria-label="Message actions">•••</summary>
+                    <form method="post" action="/admin/messages/<%= message.id %>/delete" class="inline-form">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button class="button danger small" type="submit">Delete message</button>
+                    </form>
+                  </details>
                 <% } %>
               </article>
             <% }) %>
           </div>
+
+          <form id="chat-form" class="chat-form">
+            <label class="sr-only" for="chat-input">Study message</label>
+            <input id="chat-input" maxlength="500" autocomplete="off" placeholder="Message the room…" required>
+            <button class="button primary" type="submit">Send</button>
+          </form>
+
+          <p class="chat-disclosure compact">Messages are server-validated and may be retained for moderation and audit purposes.</p>
         </div>
       </section>
-    </div>
-  </main>
+    </aside>
+  </div>
+
+  <dialog id="member-profile-dialog" class="member-profile-dialog">
+    <form method="dialog" class="dialog-close-row">
+      <button class="icon-button" value="close" aria-label="Close member profile">×</button>
+    </form>
+    <div id="member-profile-content"></div>
+  </dialog>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
