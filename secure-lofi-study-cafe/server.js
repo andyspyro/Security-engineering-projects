@@ -3117,6 +3117,11 @@ io.on("connection", async (socket) => {
       sessionRef: makeSessionRef(socket.request.sessionID)
     }).catch((err) => console.error("Socket disconnect security log error:", err));
   });
+
+  socket.emit("room:ready", {
+    roomId: DEFAULT_ROOM_ID,
+    userId: user.id
+  });
 });
 
 /* -------------------------
