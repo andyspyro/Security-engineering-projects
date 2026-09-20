@@ -27,6 +27,7 @@ async function main() {
     "rooms",
     "room_memberships",
     "messages",
+    "message_reactions",
     "music_requests",
     "music_queue",
     "sessions",
@@ -57,7 +58,8 @@ async function main() {
     "idx_security_events_client_ip",
     "idx_security_events_severity_outcome",
     "idx_audit_logs_created_at",
-    "idx_messages_user_created"
+    "idx_messages_user_created",
+    "idx_message_reactions_message"
   ]);
 
   const indexes = await db.all(
@@ -81,6 +83,17 @@ async function main() {
     if (!securityColumnNames.has(column)) {
       throw new Error(`Missing security_events column: ${column}`);
     }
+  }
+
+  const messageColumns = await db.all(
+    "PRAGMA table_info(messages)"
+  );
+  const messageColumnNames = new Set(
+    messageColumns.map((column) => column.name)
+  );
+
+  if (!messageColumnNames.has("reply_to_message_id")) {
+    throw new Error("Missing messages reply_to_message_id column.");
   }
 
   const profileColumns = await db.all(
