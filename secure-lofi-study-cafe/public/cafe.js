@@ -666,8 +666,7 @@
     }
 
     chatLog.appendChild(article);
-    loadInitialRoomMembers();
-  chatLog.scrollTop = chatLog.scrollHeight;
+    chatLog.scrollTop = chatLog.scrollHeight;
   }
 
   function estimatedControllerSeconds() {
@@ -1222,5 +1221,6 @@
       });
   }
 
+  loadInitialRoomMembers();
   chatLog.scrollTop = chatLog.scrollHeight;
 })();
