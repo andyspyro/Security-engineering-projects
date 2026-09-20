@@ -54,6 +54,7 @@ async function main() {
     "idx_security_events_created_at",
     "idx_security_events_type",
     "idx_security_events_actor",
+    "idx_security_events_client_ip",
     "idx_security_events_severity_outcome",
     "idx_audit_logs_created_at",
     "idx_messages_user_created"
@@ -66,6 +67,19 @@ async function main() {
   for (const index of requiredIndexes) {
     if (!indexes.some((row) => row.name === index)) {
       throw new Error(`Missing required index: ${index}`);
+    }
+  }
+
+  const securityColumns = await db.all(
+    "PRAGMA table_info(security_events)"
+  );
+  const securityColumnNames = new Set(
+    securityColumns.map((column) => column.name)
+  );
+
+  for (const column of ["client_ip", "user_agent"]) {
+    if (!securityColumnNames.has(column)) {
+      throw new Error(`Missing security_events column: ${column}`);
     }
   }
 
@@ -155,9 +169,11 @@ async function main() {
       route,
       request_id,
       session_ref,
+      client_ip,
+      user_agent,
       metadata
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       "smoke-test-event",
@@ -168,13 +184,15 @@ async function main() {
       "/login",
       "request-test",
       "session-test",
+      "127.0.0.1",
+      "smoke-test-agent",
       JSON.stringify({ reason: "test" })
     ]
   );
 
   const row = await db.get(
     `
-    SELECT event_type, severity, outcome
+    SELECT event_type, severity, outcome, client_ip, user_agent
     FROM security_events
     WHERE severity = ?
     ORDER BY created_at DESC
@@ -186,7 +204,9 @@ async function main() {
   if (
     !row ||
     row.event_type !== "auth.login_failed" ||
-    row.outcome !== "failed"
+    row.outcome !== "failed" ||
+    row.client_ip !== "127.0.0.1" ||
+    row.user_agent !== "smoke-test-agent"
   ) {
     throw new Error(
       "Security event insert/query verification failed."
@@ -217,7 +237,7 @@ async function main() {
 
   console.log("Self-hosted SQLite security smoke test passed.");
   console.log(
-    `Verified ${requiredTables.size} tables, ${requiredIndexes.size} indexes, RBAC seed data, room schema, WAL mode, foreign keys, session persistence, and database integrity.`
+    `Verified ${requiredTables.size} tables, ${requiredIndexes.size} indexes, RBAC seed data, room schema, network telemetry columns, WAL mode, foreign keys, session persistence, and database integrity.`
   );
 }
 
