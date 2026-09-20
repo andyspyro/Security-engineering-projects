@@ -9,12 +9,102 @@ fail() {
   exit 1
 }
 
-command -v node >/dev/null 2>&1 || fail "Node.js is required."
-command -v npm >/dev/null 2>&1 || fail "npm is required."
+ensure_node_24() {
+  local current_major=""
 
-node_major="$(node -p 'Number(process.versions.node.split(".")[0])')"
-if (( node_major < 24 || node_major >= 27 )); then
-  fail "Node.js 24 LTS is required. Found: $(node --version)"
+  if command -v node >/dev/null 2>&1; then
+    current_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || true)"
+  fi
+
+  if [[ "$current_major" == "24" ]]; then
+    return
+  fi
+
+  echo "Node.js 24 LTS is not available. Installing it with nvm..."
+
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # shellcheck disable=SC1090
+    . "$NVM_DIR/nvm.sh"
+  else
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL         https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.7/install.sh         | bash
+    elif command -v wget >/dev/null 2>&1; then
+      wget -qO-         https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.7/install.sh         | bash
+    else
+      fail "curl or wget is required so nvm can be installed."
+    fi
+
+    if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
+      fail "nvm installation completed but $NVM_DIR/nvm.sh was not found."
+    fi
+
+    # shellcheck disable=SC1090
+    . "$NVM_DIR/nvm.sh"
+  fi
+
+  nvm install 24
+  nvm alias default 24
+  nvm use 24
+
+  current_major="$(node -p 'Number(process.versions.node.split(".")[0])')"
+  if [[ "$current_major" != "24" ]]; then
+    fail "Node.js 24 installation did not become active."
+  fi
+
+  echo "Using $(node --version) with npm $(npm --version)."
+}
+
+ensure_cloudflared() {
+  if command -v cloudflared >/dev/null 2>&1; then
+    return
+  fi
+
+  echo "cloudflared is not installed. Installing a user-local copy..."
+
+  local machine
+  local asset
+  local install_dir
+  machine="$(uname -m)"
+
+  case "$machine" in
+    x86_64|amd64)
+      asset="cloudflared-linux-amd64"
+      ;;
+    aarch64|arm64)
+      asset="cloudflared-linux-arm64"
+      ;;
+    *)
+      fail "Unsupported CPU architecture for automatic cloudflared install: $machine"
+      ;;
+  esac
+
+  install_dir="$HOME/.local/bin"
+  mkdir -p "$install_dir"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fL       "https://github.com/cloudflare/cloudflared/releases/latest/download/$asset"       -o "$install_dir/cloudflared"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -O "$install_dir/cloudflared"       "https://github.com/cloudflare/cloudflared/releases/latest/download/$asset"
+  else
+    fail "curl or wget is required so cloudflared can be installed."
+  fi
+
+  chmod 700 "$install_dir/cloudflared"
+  export PATH="$install_dir:$PATH"
+
+  command -v cloudflared >/dev/null 2>&1 ||
+    fail "cloudflared installation failed."
+
+  echo "Installed $(cloudflared --version | head -n 1)."
+}
+
+ensure_node_24
+ensure_cloudflared
+
+if ! command -v npm >/dev/null 2>&1; then
+  fail "npm is unavailable after Node installation."
 fi
 
 if [[ ! -d node_modules ]]; then
@@ -105,14 +195,14 @@ echo "Local backend is healthy."
 echo "Database: $DB_PATH"
 echo
 echo "Starting a FREE temporary Cloudflare Quick Tunnel..."
-echo "The public URL will look like:"
+echo "Cloudflare will print a public URL similar to:"
 echo "  https://random-words.trycloudflare.com"
 echo
 echo "Use that SAME URL on your computer and phone."
 echo "Press Ctrl+C when you want to stop the public test."
 echo
-echo "NOTE: Cloudflare Quick Tunnels are intended for testing/development."
+echo "NOTE: Quick Tunnels are for testing/development."
 echo "For a stable production URL, use the named-tunnel/Caddy procedure in SELF-HOSTING.md."
 echo
 
-npx --yes wrangler@latest tunnel quick-start "http://127.0.0.1:3000"
+cloudflared tunnel --url "http://127.0.0.1:3000"
