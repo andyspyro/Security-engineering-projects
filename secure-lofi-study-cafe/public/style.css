@@ -3779,6 +3779,61 @@ details[open] > summary::after {
     top: 0;
     z-index: 5;
   }
+
+  body.media-focus-mode .app-main {
+    display: none;
+  }
+
+  body.media-focus-mode .app-right-rail {
+    position: static;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, .75fr);
+    grid-template-rows: auto minmax(380px, 1fr);
+    grid-template-areas:
+      "media members"
+      "media chat";
+    gap: .8rem;
+    max-height: none;
+    min-height: calc(100vh - 130px);
+    overflow: visible;
+  }
+
+  body.media-focus-mode .media-dock {
+    position: static;
+    grid-area: media;
+  }
+
+  body.media-focus-mode .members-panel {
+    grid-area: members;
+    max-height: 210px;
+  }
+
+  body.media-focus-mode .chat-panel {
+    grid-area: chat;
+    min-height: 420px;
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "heading"
+      "player"
+      "meta";
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed .media-progress-row {
+    display: grid;
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed .media-quick-controls {
+    display: flex;
+  }
+
+  body.media-focus-mode .media-dock.is-collapsed .media-queue-preview {
+    display: block;
+  }
 }
 
 /* Phone: true tabbed app shell instead of a compressed desktop stack. */
