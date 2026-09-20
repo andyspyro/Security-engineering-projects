@@ -1,7 +1,7 @@
 {
   "name": "secure-lofi-study-cafe",
-  "version": "6.0.0",
-  "description": "A production-style secure realtime social study cafe with responsive mobile/tablet/desktop UX, synchronized Watch Together media, persistent chat, presence, RBAC, and admin operations.",
+  "version": "6.1.0",
+  "description": "A production-style secure realtime social study cafe with adaptive mobile/tablet/desktop UX, persistent Watch Together mini-player, synchronized media, chat, presence, RBAC, and admin operations.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
