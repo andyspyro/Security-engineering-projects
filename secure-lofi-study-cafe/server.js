@@ -8,6 +8,7 @@ const session = require("express-session");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
+const net = require("net");
 const { Server } = require("socket.io");
 const { body, validationResult } = require("express-validator");
 const db = require("./database");
@@ -436,6 +437,8 @@ app.use((req, res, next) => {
           : String(req.path || ""),
       requestId: req.requestId,
       sessionRef: makeSessionRef(req.sessionID),
+      clientIp: getRequestClientIp(req),
+      userAgent: normalizeUserAgent(req.get("user-agent")),
       metadata: {
         statusCode,
         durationMs
@@ -689,6 +692,59 @@ function normalizeSeverity(value) {
     : "INFO";
 }
 
+function normalizeClientIp(value) {
+  if (!value) {
+    return null;
+  }
+
+  let candidate = String(value)
+    .split(",")[0]
+    .trim()
+    .replace(/^\[|\]$/g, "");
+
+  if (candidate.startsWith("::ffff:")) {
+    candidate = candidate.slice(7);
+  }
+
+  return net.isIP(candidate) ? candidate.slice(0, 64) : null;
+}
+
+function getRequestClientIp(req) {
+  if (TRUST_PROXY) {
+    const cloudflareIp = normalizeClientIp(req.get("cf-connecting-ip"));
+    if (cloudflareIp) {
+      return cloudflareIp;
+    }
+  }
+
+  return normalizeClientIp(req.ip || req.socket.remoteAddress);
+}
+
+function getSocketClientIp(socket) {
+  if (TRUST_PROXY) {
+    const cloudflareIp = normalizeClientIp(
+      socket.handshake.headers["cf-connecting-ip"]
+    );
+    if (cloudflareIp) {
+      return cloudflareIp;
+    }
+
+    const forwarded = normalizeClientIp(
+      socket.handshake.headers["x-forwarded-for"]
+    );
+    if (forwarded) {
+      return forwarded;
+    }
+  }
+
+  return normalizeClientIp(socket.handshake.address);
+}
+
+function normalizeUserAgent(value) {
+  const userAgent = String(value || "").trim();
+  return userAgent ? userAgent.slice(0, 300) : null;
+}
+
 async function writeSecurityEvent({
   eventType,
   severity = "INFO",
@@ -700,6 +756,8 @@ async function writeSecurityEvent({
   route = null,
   requestId = null,
   sessionRef = null,
+  clientIp = null,
+  userAgent = null,
   metadata = null
 }) {
   const safeMetadata =
@@ -721,9 +779,11 @@ async function writeSecurityEvent({
       route,
       request_id,
       session_ref,
+      client_ip,
+      user_agent,
       metadata
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       crypto.randomUUID(),
@@ -737,6 +797,8 @@ async function writeSecurityEvent({
       route ? String(route).slice(0, 200) : null,
       requestId ? String(requestId).slice(0, 80) : null,
       sessionRef ? String(sessionRef).slice(0, 64) : null,
+      normalizeClientIp(clientIp),
+      normalizeUserAgent(userAgent),
       safeMetadata
     ]
   );
@@ -768,6 +830,8 @@ async function recordRequestSecurityEvent(
     route: req.route && req.route.path ? req.route.path : req.path,
     requestId: req.requestId || null,
     sessionRef: req.sessionRef || makeSessionRef(req.sessionID),
+    clientIp: getRequestClientIp(req),
+    userAgent: normalizeUserAgent(req.get("user-agent")),
     metadata
   });
 }
@@ -2805,7 +2869,16 @@ io.on("connection", async (socket) => {
     outcome: "success",
     route: "socket.io",
     sessionRef: makeSessionRef(socket.request.sessionID),
-    metadata: { socketId: crypto.createHash("sha256").update(socket.id).digest("hex").slice(0, 16) }
+    clientIp: getSocketClientIp(socket),
+    userAgent: normalizeUserAgent(socket.handshake.headers["user-agent"]),
+    metadata: {
+      socketId: crypto
+        .createHash("sha256")
+        .update(socket.id)
+        .digest("hex")
+        .slice(0, 16),
+      transport: socket.conn.transport.name
+    }
   }).catch((err) => console.error("Socket connection security log error:", err));
 
   try {
@@ -2911,10 +2984,31 @@ io.on("connection", async (socket) => {
       return;
     }
 
+    const now = Date.now();
+    const previousMoveAt = Number(socket.data.lastAvatarMoveAt || 0);
+
+    // Cap inbound movement updates to ~30 Hz per socket. The browser renders
+    // locally at animation-frame speed, while the network sends lightweight
+    // position deltas. This avoids rebuilding the full presence list on every
+    // movement packet.
+    if (now - previousMoveAt < 32) {
+      return;
+    }
+
+    socket.data.lastAvatarMoveAt = now;
+
     member.avatarX = clampPercent(data && data.x, member.avatarX);
     member.avatarY = clampPercent(data && data.y, member.avatarY);
-    member.updatedAt = Date.now();
-    emitPresence();
+    member.updatedAt = now;
+
+    socket
+      .to(roomPresence.channel(DEFAULT_ROOM_ID))
+      .volatile.emit("member:moved", {
+        userId: user.id,
+        x: member.avatarX,
+        y: member.avatarY,
+        serverNow: now
+      });
   });
 
   socket.on("member:avatar", async (data) => {
@@ -3105,7 +3199,7 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", (reason) => {
     clearInterval(sessionValidationTimer);
 
     removeSocketFromPresence(socket, user)
@@ -3118,7 +3212,12 @@ io.on("connection", async (socket) => {
       usernameSnapshot: user.username,
       outcome: "success",
       route: "socket.io",
-      sessionRef: makeSessionRef(socket.request.sessionID)
+      sessionRef: makeSessionRef(socket.request.sessionID),
+      clientIp: getSocketClientIp(socket),
+      userAgent: normalizeUserAgent(socket.handshake.headers["user-agent"]),
+      metadata: {
+        reason: String(reason || "unknown").slice(0, 120)
+      }
     }).catch((err) => console.error("Socket disconnect security log error:", err));
   });
 
