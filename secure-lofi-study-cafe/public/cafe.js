@@ -412,10 +412,16 @@
       now - lastMovementEmit >= MOVE_EMIT_INTERVAL_MS
     ) {
       lastMovementEmit = now;
-      socket.volatile.emit("member:move", {
+      const movementPayload = {
         x: member.avatarX,
         y: member.avatarY
-      });
+      };
+
+      if (emitNow) {
+        socket.emit("member:move", movementPayload);
+      } else {
+        socket.volatile.emit("member:move", movementPayload);
+      }
     }
   }
 
