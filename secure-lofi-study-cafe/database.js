@@ -159,12 +159,24 @@ async function initialize() {
       room_id INTEGER NOT NULL DEFAULT 1,
       user_id INTEGER NOT NULL,
       message_text TEXT NOT NULL,
+      reply_to_message_id INTEGER,
       deleted_at DATETIME,
       deleted_by INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (reply_to_message_id) REFERENCES messages(id) ON DELETE SET NULL,
       FOREIGN KEY (deleted_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS message_reactions (
+      message_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      emoji TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (message_id, user_id, emoji),
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS music_requests (
@@ -278,6 +290,11 @@ async function initialize() {
     "messages",
     "deleted_by",
     "ALTER TABLE messages ADD COLUMN deleted_by INTEGER"
+  );
+  await addColumnIfMissing(
+    "messages",
+    "reply_to_message_id",
+    "ALTER TABLE messages ADD COLUMN reply_to_message_id INTEGER"
   );
   await addColumnIfMissing(
     "music_requests",
@@ -432,6 +449,9 @@ async function initialize() {
 
     CREATE INDEX IF NOT EXISTS idx_messages_user_created
       ON messages(user_id, created_at);
+
+    CREATE INDEX IF NOT EXISTS idx_message_reactions_message
+      ON message_reactions(message_id, created_at);
   `);
 
   const journal = await rawGet("PRAGMA journal_mode");
