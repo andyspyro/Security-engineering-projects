@@ -29,7 +29,19 @@
   </header>
 
   <main class="admin-shell">
-    <section class="admin-stat-grid" aria-label="Audit summary">
+    <nav class="admin-command-bar" aria-label="Admin console sections">
+      <a class="admin-command-link" href="#overview">Overview</a>
+      <a class="admin-command-link" href="#connected-users">Connected Users</a>
+      <a class="admin-command-link" href="#sessions">Sessions</a>
+      <a class="admin-command-link" href="#realtime">Realtime</a>
+      <a class="admin-command-link" href="#moderation">Moderation</a>
+      <a class="admin-command-link" href="#music-requests">Music Requests</a>
+      <a class="admin-command-link" href="#audit-log">Audit Log</a>
+      <a class="admin-command-link" href="#security-events">Security Events</a>
+      <a class="admin-command-link" href="#system">System</a>
+    </nav>
+
+    <section id="overview" class="admin-stat-grid admin-anchor" aria-label="Audit summary">
       <article class="admin-stat">
         <span>Users</span>
         <strong><%= counts.users %></strong>
@@ -80,7 +92,7 @@
       </article>
     </section>
 
-    <section class="panel admin-policy">
+    <section class="panel admin-policy admin-anchor">
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Privacy Boundary</p>
@@ -101,7 +113,7 @@
       </p>
     </section>
 
-    <section class="panel">
+    <section id="session-security" class="panel admin-anchor">
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Current Admin Request</p>
@@ -134,7 +146,7 @@
       </p>
     </section>
 
-    <section class="panel">
+    <section id="system" class="panel admin-anchor">
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Server Operations</p>
@@ -169,10 +181,10 @@
       </label>
     </section>
 
-    <section class="panel admin-section" data-admin-section>
+    <section id="connected-users" class="panel admin-section admin-anchor" data-admin-section>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">Accounts</p>
+          <p class="eyebrow">Accounts & Presence</p>
           <h2>User Directory</h2>
         </div>
         <span class="badge admin">permanent-admin view</span>
@@ -212,14 +224,31 @@
                 <td><%= account.created_at %></td>
                 <td><%= account.message_count %></td>
                 <td>
-                  <% if (account.id !== user.id) { %>
-                    <form method="post" action="/admin/users/<%= account.id %>/revoke-sessions">
-                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                      <button class="button danger small" type="submit">Revoke Sessions</button>
-                    </form>
-                  <% } else { %>
-                    <span class="admin-small">current admin</span>
-                  <% } %>
+                  <div class="list-actions">
+                    <button
+                      class="button secondary small admin-inspect-button"
+                      type="button"
+                      data-admin-inspect
+                      data-user-id="<%= account.id %>"
+                      data-username="<%= account.username %>"
+                      data-role="<%= account.role %>"
+                      data-online="<%= account.online ? "true" : "false" %>"
+                      data-connections="<%= account.connection_count %>"
+                      data-last-seen="<%= account.last_seen_at || "" %>"
+                      data-ip="<%= account.latest_ip || "" %>"
+                      data-user-agent="<%= account.latest_user_agent || "" %>"
+                      data-created="<%= account.created_at %>"
+                      data-messages="<%= account.message_count %>"
+                    >Inspect</button>
+                    <% if (account.id !== user.id) { %>
+                      <form method="post" action="/admin/users/<%= account.id %>/revoke-sessions" data-confirm-revoke="<%= account.username %>">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button class="button danger small" type="submit">Revoke Sessions</button>
+                      </form>
+                    <% } else { %>
+                      <span class="admin-small">current admin</span>
+                    <% } %>
+                  </div>
                 </td>
               </tr>
             <% }) %>
@@ -228,7 +257,7 @@
       </div>
     </section>
 
-    <section class="panel admin-section" data-admin-section>
+    <section id="sessions" class="panel admin-section admin-anchor" data-admin-section>
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Authenticated Sessions</p>
@@ -269,7 +298,7 @@
       </div>
     </section>
 
-    <section class="panel admin-section" data-admin-section>
+    <section id="realtime" class="panel admin-section admin-anchor" data-admin-section>
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Connection History</p>
@@ -310,7 +339,7 @@
       </div>
     </section>
 
-    <section class="panel admin-section" data-admin-section>
+    <section id="security-events" class="panel admin-section admin-anchor" data-admin-section>
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Security Telemetry</p>
@@ -363,7 +392,7 @@
       </div>
     </section>
 
-    <section class="panel admin-section" data-admin-section>
+    <section id="audit-log" class="panel admin-section admin-anchor" data-admin-section>
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Audit Trail</p>
@@ -400,10 +429,10 @@
       </div>
     </section>
 
-    <section class="panel admin-section" data-admin-section>
+    <section id="moderation" class="panel admin-section admin-anchor" data-admin-section>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">Communication</p>
+          <p class="eyebrow">Communication & Moderation</p>
           <h2>Chat Message History</h2>
         </div>
         <span class="badge"><%= messageHistory.length %> shown</span>
@@ -449,7 +478,7 @@
       </div>
     </section>
 
-    <section class="panel admin-section" data-admin-section>
+    <section id="music-requests" class="panel admin-section admin-anchor" data-admin-section>
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Media Workflow</p>
@@ -484,6 +513,13 @@
       </div>
     </section>
   </main>
+
+  <dialog id="admin-user-inspector" class="admin-user-inspector">
+    <form method="dialog" class="dialog-close-row">
+      <button class="icon-button" value="close" aria-label="Close user inspector">×</button>
+    </form>
+    <div id="admin-user-inspector-content"></div>
+  </dialog>
 
   <script src="/admin.js"></script>
 </body>
