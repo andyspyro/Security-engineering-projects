@@ -955,21 +955,126 @@
     });
   }
 
-  function appendMessage(message, system = false) {
+  function formatClock(totalSeconds) {
+    const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const minutes = Math.floor(safe / 60);
+    const seconds = safe % 60;
+    return minutes + ":" + String(seconds).padStart(2, "0");
+  }
+
+  function renderReactionSummary(messageId, reactions = []) {
+    const container = chatLog.querySelector(
+      "[data-reactions-for=\"" + String(messageId) + "\"]"
+    );
+
+    if (!container) {
+      return;
+    }
+
+    container.replaceChildren();
+
+    reactions.forEach((reaction) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "reaction-chip";
+      button.dataset.reactMessage = String(messageId);
+      button.dataset.reactEmoji = reaction.emoji;
+
+      const emoji = document.createElement("span");
+      emoji.textContent = reaction.emoji;
+      const count = document.createElement("strong");
+      count.textContent = String(reaction.count || 0);
+
+      button.append(emoji, count);
+      container.appendChild(button);
+    });
+  }
+
+  function setReplyTarget(messageId) {
+    const article = chatLog.querySelector(
+      "[data-message-id=\"" + String(messageId) + "\"]"
+    );
+
+    if (!article) {
+      return;
+    }
+
+    const username = article.dataset.messageUser || "member";
+    const messageText =
+      article.querySelector(".message-text")?.textContent?.trim() || "";
+
+    currentReply = {
+      id: Number(messageId),
+      username,
+      text: messageText.slice(0, 120)
+    };
+
+    if (replyComposerBanner) {
+      replyComposerBanner.hidden = false;
+      replyComposerTitle.textContent = "Replying to " + username;
+      replyComposerText.textContent = currentReply.text;
+    }
+
+    chatInput.focus();
+  }
+
+  function clearReplyTarget() {
+    currentReply = null;
+    if (replyComposerBanner) {
+      replyComposerBanner.hidden = true;
+    }
+  }
+
+  function updateUnread(delta = 1) {
+    unreadCount = Math.max(0, unreadCount + delta);
+
+    if (unreadBadge) {
+      unreadBadge.hidden = unreadCount === 0;
+      unreadBadge.textContent =
+        unreadCount === 1 ? "1 unread" : unreadCount + " unread";
+    }
+
+    if (mobileUnreadDot) {
+      mobileUnreadDot.hidden = unreadCount === 0;
+    }
+  }
+
+  function showJoinLeaveBanner(text) {
+    if (!joinLeaveBanner || !text) {
+      return;
+    }
+
+    joinLeaveBanner.textContent = text;
+    joinLeaveBanner.classList.add("is-visible");
+
+    clearTimeout(joinLeaveBanner._hideTimer);
+    joinLeaveBanner._hideTimer = setTimeout(() => {
+      joinLeaveBanner.classList.remove("is-visible");
+    }, 2600);
+  }
+
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\  function appendMessage(message, system = false) {
     const messageId =
       !system && message && message.id
         ? String(message.id)
         : null;
 
     if (messageId && messageIds.has(messageId)) {
+      if (message.reactions) {
+        renderReactionSummary(messageId, message.reactions);
+      }
       return;
     }
 
     const article = document.createElement("article");
-    article.className = system ? "message system" : "message";
+    article.className = system
+      ? "message system message-enter"
+      : "message message-enter";
 
     if (messageId) {
       article.dataset.messageId = messageId;
+      article.dataset.messageUser = message.username || "";
       messageIds.add(messageId);
     }
 
@@ -978,11 +1083,35 @@
       text.textContent = message.text;
       article.appendChild(text);
     } else {
+      if (message.reply_to_message_id && message.reply_message_text) {
+        const replyPreview = document.createElement("div");
+        replyPreview.className = "reply-preview";
+
+        const replyName = document.createElement("strong");
+        replyName.textContent =
+          "Replying to " + (message.reply_username || "message");
+
+        const replyText = document.createElement("span");
+        replyText.textContent = message.reply_message_text;
+
+        replyPreview.append(replyName, replyText);
+        article.appendChild(replyPreview);
+      }
+
       const meta = document.createElement("div");
       meta.className = "message-meta";
 
+      const authorWrap = document.createElement("div");
+      authorWrap.className = "message-author";
+
+      const avatar = document.createElement("span");
+      avatar.className = "message-avatar";
+      avatar.textContent = String(message.username || "?").slice(0, 1).toUpperCase();
+
       const author = document.createElement("strong");
       author.textContent = message.username;
+
+      authorWrap.append(avatar, author);
 
       const time = document.createElement("span");
       time.textContent = new Date(
@@ -990,10 +1119,40 @@
       ).toLocaleString();
 
       const text = document.createElement("p");
+      text.className = "message-text";
       text.textContent = message.message_text;
 
-      meta.append(author, time);
+      meta.append(authorWrap, time);
       article.append(meta, text);
+
+      const reactionSummary = document.createElement("div");
+      reactionSummary.className = "message-reactions";
+      reactionSummary.dataset.reactionsFor = messageId;
+
+      const inlineActions = document.createElement("div");
+      inlineActions.className = "message-inline-actions";
+
+      const replyButton = document.createElement("button");
+      replyButton.type = "button";
+      replyButton.className = "message-reply-button";
+      replyButton.dataset.replyMessage = messageId;
+      replyButton.textContent = "Reply";
+
+      const picker = document.createElement("div");
+      picker.className = "reaction-picker";
+
+      ["☕", "💜", "👍", "✨", "😂"].forEach((emojiValue) => {
+        const reactionButton = document.createElement("button");
+        reactionButton.type = "button";
+        reactionButton.dataset.reactMessage = messageId;
+        reactionButton.dataset.reactEmoji = emojiValue;
+        reactionButton.setAttribute("aria-label", "React " + emojiValue);
+        reactionButton.textContent = emojiValue;
+        picker.appendChild(reactionButton);
+      });
+
+      inlineActions.append(replyButton, picker);
+      article.append(reactionSummary, inlineActions);
 
       if (canModerate && message.id) {
         const menu = document.createElement("details");
@@ -1004,7 +1163,7 @@
         summary.textContent = "•••";
 
         const form = actionForm(
-          `/admin/messages/${message.id}/delete`,
+          "/admin/messages/" + message.id + "/delete",
           "Delete message",
           "danger"
         );
@@ -1016,9 +1175,13 @@
     }
 
     chatLog.appendChild(article);
+
+    if (messageId && message.reactions) {
+      renderReactionSummary(messageId, message.reactions);
+    }
+
     chatLog.scrollTop = chatLog.scrollHeight;
   }
-
   function estimatedControllerSeconds() {
     if (!controllerState) {
       return 0;
