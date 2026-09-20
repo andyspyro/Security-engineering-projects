@@ -1712,9 +1712,12 @@ app.get("/cafe", requireLogin, async (req, res) => {
       FROM messages
       JOIN users ON messages.user_id = users.id
       WHERE messages.deleted_at IS NULL
+        AND messages.room_id = ?
       ORDER BY messages.created_at DESC
       LIMIT 50
       `
+    ,
+      [DEFAULT_ROOM_ID]
     );
 
     res.render("cafe", {
@@ -2821,8 +2824,8 @@ io.on("connection", async (socket) => {
         user.role === "admin" ? rawMessage : censorBadWords(rawMessage);
 
       const result = await db.run(
-        "INSERT INTO messages (user_id, message_text) VALUES (?, ?)",
-        [user.id, storedMessage]
+        "INSERT INTO messages (room_id, user_id, message_text) VALUES (?, ?, ?)",
+        [DEFAULT_ROOM_ID, user.id, storedMessage]
       );
 
       await writeAudit(
@@ -2850,11 +2853,19 @@ io.on("connection", async (socket) => {
         FROM messages
         JOIN users ON messages.user_id = users.id
         WHERE messages.id = ?
+          AND messages.room_id = ?
         `,
-        [result.lastID]
+        [result.lastID, DEFAULT_ROOM_ID]
       );
 
-      io.emit("chat:new", savedMessage);
+      io.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit(
+        "message:created",
+        savedMessage
+      );
+      io.to(roomPresence.channel(DEFAULT_ROOM_ID)).emit(
+        "chat:new",
+        savedMessage
+      );
     } catch (err) {
       console.error("Live chat error:", err);
     }
