@@ -12,6 +12,8 @@ const { Server } = require("socket.io");
 const { body, validationResult } = require("express-validator");
 const db = require("./database");
 const SQLiteSessionStore = require("./sqlite-session-store");
+const RoomPresence = require("./services/room-presence");
+const createApiRouter = require("./routes/api");
 
 const app = express();
 
@@ -23,7 +25,11 @@ if (TRUST_PROXY) {
 }
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  pingInterval: 25000,
+  pingTimeout: 20000,
+  transports: ["websocket", "polling"]
+});
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -31,6 +37,32 @@ const HOST = process.env.HOST || "127.0.0.1";
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const DEFAULT_ROOM_ID = db.DEFAULT_ROOM_ID || 1;
+
+const configuredOrigins = new Set(
+  [
+    process.env.PUBLIC_ORIGIN,
+    ...(process.env.ALLOWED_ORIGINS || "")
+      .split(",")
+      .map((value) => value.trim())
+  ].filter(Boolean)
+);
+
+function isAllowedRealtimeOrigin(origin, host) {
+  if (!origin) {
+    return true;
+  }
+
+  if (configuredOrigins.size > 0) {
+    return configuredOrigins.has(origin);
+  }
+
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
 
 if (!SESSION_SECRET) {
   throw new Error("SESSION_SECRET is required. Copy .env.example to .env and set a random value.");
@@ -40,7 +72,12 @@ if (!SESSION_SECRET) {
    In-memory room state
 ------------------------- */
 
-const onlineUsers = new Map();
+const roomPresence = new RoomPresence({
+  db,
+  io,
+  defaultRoomId: DEFAULT_ROOM_ID
+});
+const onlineUsers = roomPresence.roomMap(DEFAULT_ROOM_ID);
 const tempModeratorIds = new Set();
 const nextVotes = new Map();
 
