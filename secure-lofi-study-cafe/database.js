@@ -15,9 +15,7 @@ const databasePath = path.resolve(
   process.env.DB_PATH || defaultDatabasePath
 );
 
-const databaseDirectory = path.dirname(databasePath);
-
-fs.mkdirSync(databaseDirectory, {
+fs.mkdirSync(path.dirname(databasePath), {
   recursive: true,
   mode: 0o700
 });
@@ -82,6 +80,12 @@ function rawExec(sql) {
 async function columnExists(table, column) {
   const rows = await rawAll(`PRAGMA table_info(${table})`);
   return rows.some((row) => row.name === column);
+}
+
+async function addColumnIfMissing(table, column, sql) {
+  if (!(await columnExists(table, column))) {
+    await rawRun(sql);
+  }
 }
 
 async function initialize() {
@@ -244,6 +248,121 @@ async function initialize() {
       FOREIGN KEY (actor_user_id) REFERENCES users(id),
       FOREIGN KEY (target_user_id) REFERENCES users(id)
     );
+  `);
+
+  // Backward-compatible migrations for databases created by earlier releases.
+  await addColumnIfMissing(
+    "users",
+    "avatar_image",
+    "ALTER TABLE users ADD COLUMN avatar_image TEXT"
+  );
+  await addColumnIfMissing(
+    "messages",
+    "room_id",
+    "ALTER TABLE messages ADD COLUMN room_id INTEGER NOT NULL DEFAULT 1"
+  );
+  await addColumnIfMissing(
+    "messages",
+    "deleted_at",
+    "ALTER TABLE messages ADD COLUMN deleted_at DATETIME"
+  );
+  await addColumnIfMissing(
+    "messages",
+    "deleted_by",
+    "ALTER TABLE messages ADD COLUMN deleted_by INTEGER"
+  );
+  await addColumnIfMissing(
+    "music_requests",
+    "room_id",
+    "ALTER TABLE music_requests ADD COLUMN room_id INTEGER NOT NULL DEFAULT 1"
+  );
+  await addColumnIfMissing(
+    "music_requests",
+    "start_seconds",
+    "ALTER TABLE music_requests ADD COLUMN start_seconds INTEGER NOT NULL DEFAULT 0"
+  );
+  await addColumnIfMissing(
+    "music_queue",
+    "room_id",
+    "ALTER TABLE music_queue ADD COLUMN room_id INTEGER NOT NULL DEFAULT 1"
+  );
+  await addColumnIfMissing(
+    "audit_logs",
+    "event_type",
+    "ALTER TABLE audit_logs ADD COLUMN event_type TEXT NOT NULL DEFAULT 'legacy'"
+  );
+  await addColumnIfMissing(
+    "audit_logs",
+    "target_user_id",
+    "ALTER TABLE audit_logs ADD COLUMN target_user_id INTEGER"
+  );
+  await addColumnIfMissing(
+    "audit_logs",
+    "details",
+    "ALTER TABLE audit_logs ADD COLUMN details TEXT"
+  );
+
+  await rawExec(`
+    INSERT OR IGNORE INTO roles (name, description) VALUES
+      ('admin', 'Permanent administrator'),
+      ('mod', 'Moderator'),
+      ('user', 'Regular user');
+
+    INSERT OR IGNORE INTO permissions (name, description) VALUES
+      ('room.use', 'Use normal room features'),
+      ('room.moderate', 'Moderate room content'),
+      ('admin.console', 'Open the administrator console'),
+      ('admin.users.read', 'Read administrative user data'),
+      ('admin.users.write', 'Change user roles');
+
+    INSERT OR IGNORE INTO role_permissions (role_name, permission_name) VALUES
+      ('user', 'room.use'),
+      ('mod', 'room.use'),
+      ('mod', 'room.moderate'),
+      ('admin', 'room.use'),
+      ('admin', 'room.moderate'),
+      ('admin', 'admin.console'),
+      ('admin', 'admin.users.read'),
+      ('admin', 'admin.users.write');
+
+    INSERT OR IGNORE INTO rooms (id, slug, name, created_by)
+      VALUES (1, 'main', 'Main Study Café', NULL);
+
+    INSERT OR IGNORE INTO user_profiles (
+      user_id,
+      display_name,
+      last_seen_at
+    )
+    SELECT id, username, created_at
+    FROM users;
+
+    INSERT OR IGNORE INTO room_memberships (
+      room_id,
+      user_id,
+      last_joined_at
+    )
+    SELECT 1, id, created_at
+    FROM users;
+
+    UPDATE messages
+    SET room_id = 1
+    WHERE room_id IS NULL;
+
+    UPDATE music_requests
+    SET room_id = 1
+    WHERE room_id IS NULL;
+
+    UPDATE music_queue
+    SET room_id = 1
+    WHERE room_id IS NULL;
+
+    -- A process restart cannot prove an old socket is still connected.
+    -- Reconcile any stale online rows to offline before accepting new sockets.
+    UPDATE presence_sessions
+    SET status = 'offline',
+        disconnected_at = COALESCE(disconnected_at, CURRENT_TIMESTAMP),
+        last_seen_at = CURRENT_TIMESTAMP
+    WHERE status = 'online';
 
     CREATE INDEX IF NOT EXISTS idx_sessions_expires_at
       ON sessions(expires_at);
@@ -277,120 +396,6 @@ async function initialize() {
 
     CREATE INDEX IF NOT EXISTS idx_messages_user_created
       ON messages(user_id, created_at);
-  `);
-
-  const migrations = [
-    ["users", "avatar_image", "ALTER TABLE users ADD COLUMN avatar_image TEXT"],
-    [
-      "messages",
-      "room_id",
-      "ALTER TABLE messages ADD COLUMN room_id INTEGER NOT NULL DEFAULT 1"
-    ],
-    [
-      "messages",
-      "deleted_at",
-      "ALTER TABLE messages ADD COLUMN deleted_at DATETIME"
-    ],
-    [
-      "messages",
-      "deleted_by",
-      "ALTER TABLE messages ADD COLUMN deleted_by INTEGER"
-    ],
-    [
-      "music_requests",
-      "room_id",
-      "ALTER TABLE music_requests ADD COLUMN room_id INTEGER NOT NULL DEFAULT 1"
-    ],
-    [
-      "music_requests",
-      "start_seconds",
-      "ALTER TABLE music_requests ADD COLUMN start_seconds INTEGER NOT NULL DEFAULT 0"
-    ],
-    [
-      "music_queue",
-      "room_id",
-      "ALTER TABLE music_queue ADD COLUMN room_id INTEGER NOT NULL DEFAULT 1"
-    ],
-    [
-      "audit_logs",
-      "event_type",
-      "ALTER TABLE audit_logs ADD COLUMN event_type TEXT NOT NULL DEFAULT 'legacy'"
-    ],
-    [
-      "audit_logs",
-      "target_user_id",
-      "ALTER TABLE audit_logs ADD COLUMN target_user_id INTEGER"
-    ],
-    [
-      "audit_logs",
-      "details",
-      "ALTER TABLE audit_logs ADD COLUMN details TEXT"
-    ]
-  ];
-
-  for (const [table, column, statement] of migrations) {
-    if (!(await columnExists(table, column))) {
-      await rawRun(statement);
-    }
-  }
-
-  await rawExec(`
-    INSERT OR IGNORE INTO roles (name, description) VALUES
-      ('admin', 'Permanent administrator'),
-      ('mod', 'Moderator'),
-      ('user', 'Regular user');
-
-    INSERT OR IGNORE INTO permissions (name, description) VALUES
-      ('room.use', 'Use normal room features'),
-      ('room.moderate', 'Moderate room content'),
-      ('admin.console', 'Open the administrator console'),
-      ('admin.users.read', 'Read administrative user data'),
-      ('admin.users.write', 'Change user roles');
-
-    INSERT OR IGNORE INTO role_permissions (role_name, permission_name) VALUES
-      ('user', 'room.use'),
-      ('mod', 'room.use'),
-      ('mod', 'room.moderate'),
-      ('admin', 'room.use'),
-      ('admin', 'room.moderate'),
-      ('admin', 'admin.console'),
-      ('admin', 'admin.users.read'),
-      ('admin', 'admin.users.write');
-
-    INSERT OR IGNORE INTO rooms (id, slug, name, created_by)
-      VALUES (1, 'main', 'Main Study Café', NULL);
-
-    INSERT OR IGNORE INTO user_profiles (user_id, display_name)
-      SELECT id, username FROM users;
-
-    INSERT OR IGNORE INTO room_memberships (room_id, user_id, last_joined_at)
-      SELECT 1, id, CURRENT_TIMESTAMP FROM users;
-
-    UPDATE presence_sessions
-    SET status = 'offline',
-        last_seen_at = CURRENT_TIMESTAMP,
-        disconnected_at = COALESCE(disconnected_at, CURRENT_TIMESTAMP)
-    WHERE status IN ('online', 'connected');
-
-    CREATE TRIGGER IF NOT EXISTS users_role_validate_insert
-    BEFORE INSERT ON users
-    FOR EACH ROW
-    WHEN NOT EXISTS (
-      SELECT 1 FROM roles WHERE name = NEW.role
-    )
-    BEGIN
-      SELECT RAISE(ABORT, 'invalid role');
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS users_role_validate_update
-    BEFORE UPDATE OF role ON users
-    FOR EACH ROW
-    WHEN NOT EXISTS (
-      SELECT 1 FROM roles WHERE name = NEW.role
-    )
-    BEGIN
-      SELECT RAISE(ABORT, 'invalid role');
-    END;
   `);
 
   const journal = await rawGet("PRAGMA journal_mode");
