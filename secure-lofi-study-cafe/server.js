@@ -448,9 +448,16 @@ app.use((req, res, next) => {
 io.engine.use(sessionMiddleware);
 
 io.use((socket, next) => {
+  const origin = socket.handshake.headers.origin;
+  const host = socket.handshake.headers.host;
+
+  if (!isAllowedRealtimeOrigin(origin, host)) {
+    return next(new Error("origin not allowed"));
+  }
+
   const userSession = socket.request.session;
 
-  if (!userSession || !userSession.user) {
+  if (!userSession || !userSession.user || !userSession.user.id) {
     return next(new Error("authentication required"));
   }
 
@@ -2689,25 +2696,79 @@ async function sendRoomSnapshot(socket, user) {
 io.on("connection", async (socket) => {
   const userSession = socket.request.session;
 
-  if (!userSession || !userSession.user) {
-    socket.disconnect();
+  if (!userSession || !userSession.user || !userSession.user.id) {
+    socket.disconnect(true);
     return;
   }
 
-  const user = userSession.user;
+  const currentUser = await db.get(
+    "SELECT id, username, role, avatar_image FROM users WHERE id = ?",
+    [userSession.user.id]
+  );
 
-  try {
-    const profile = await db.get(
-      "SELECT avatar_image FROM users WHERE id = ?",
-      [user.id]
-    );
-    user.avatarImage = profile ? profile.avatar_image : null;
-  } catch (err) {
-    console.error("Profile image load error:", err);
-    user.avatarImage = null;
+  if (!currentUser) {
+    socket.disconnect(true);
+    return;
   }
 
-  addSocketToPresence(socket, user);
+  const user = {
+    id: currentUser.id,
+    username: currentUser.username,
+    role: currentUser.role,
+    avatarImage: currentUser.avatar_image
+  };
+
+  userSession.user = {
+    id: user.id,
+    username: user.username,
+    role: user.role
+  };
+
+  await addSocketToPresence(socket, user);
+
+  const sessionValidationTimer = setInterval(async () => {
+    try {
+      const storedSession = await db.get(
+        "SELECT sess, expires_at FROM sessions WHERE sid = ?",
+        [socket.request.sessionID]
+      );
+
+      if (!storedSession || Number(storedSession.expires_at) <= Date.now()) {
+        socket.emit("session:expired");
+        socket.disconnect(true);
+        return;
+      }
+
+      const persistedUser = await db.get(
+        "SELECT id, username, role FROM users WHERE id = ?",
+        [user.id]
+      );
+
+      if (!persistedUser) {
+        socket.emit("session:expired");
+        socket.disconnect(true);
+        return;
+      }
+
+      user.role = persistedUser.role;
+      userSession.user.role = persistedUser.role;
+
+      roomPresence.updateMember(
+        DEFAULT_ROOM_ID,
+        user.id,
+        (member) => {
+          member.role = persistedUser.role;
+        }
+      );
+
+      await roomPresence.heartbeat(socket.id);
+    } catch (err) {
+      console.error("Realtime session validation failed:", err);
+      socket.disconnect(true);
+    }
+  }, 30000);
+
+  sessionValidationTimer.unref();
 
   writeSecurityEvent({
     eventType: "socket.connected",
@@ -2995,7 +3056,10 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("disconnect", () => {
-    removeSocketFromPresence(socket, user);
+    clearInterval(sessionValidationTimer);
+
+    removeSocketFromPresence(socket, user)
+      .catch((err) => console.error("Presence disconnect error:", err));
 
     writeSecurityEvent({
       eventType: "socket.disconnected",
