@@ -779,10 +779,6 @@ function createApiRouter({
     }
   );
 
-  router.use((req, res) => {
-    jsonError(res, 404, "API_ROUTE_NOT_FOUND", "API route not found.");
-  });
-
   return router;
 }
 
