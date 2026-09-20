@@ -1463,7 +1463,7 @@
     const storedMembersPreference =
       localStorage.getItem("lofi.membersExpanded");
     const mobileByDefault =
-      window.matchMedia("(max-width: 820px)").matches;
+      window.matchMedia("(max-width: 1180px)").matches;
 
     if (storedMembersPreference === null && mobileByDefault) {
       membersDetails.open = false;
