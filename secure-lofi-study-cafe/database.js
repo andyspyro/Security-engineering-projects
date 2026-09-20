@@ -243,6 +243,8 @@ async function initialize() {
       route TEXT,
       request_id TEXT,
       session_ref TEXT,
+      client_ip TEXT,
+      user_agent TEXT,
       metadata TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (actor_user_id) REFERENCES users(id),
@@ -300,6 +302,16 @@ async function initialize() {
     "audit_logs",
     "details",
     "ALTER TABLE audit_logs ADD COLUMN details TEXT"
+  );
+  await addColumnIfMissing(
+    "security_events",
+    "client_ip",
+    "ALTER TABLE security_events ADD COLUMN client_ip TEXT"
+  );
+  await addColumnIfMissing(
+    "security_events",
+    "user_agent",
+    "ALTER TABLE security_events ADD COLUMN user_agent TEXT"
   );
 
   await rawExec(`
@@ -402,6 +414,9 @@ async function initialize() {
 
     CREATE INDEX IF NOT EXISTS idx_security_events_actor
       ON security_events(actor_user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_security_events_client_ip
+      ON security_events(client_ip, created_at);
 
     CREATE INDEX IF NOT EXISTS idx_security_events_severity_outcome
       ON security_events(severity, outcome);
