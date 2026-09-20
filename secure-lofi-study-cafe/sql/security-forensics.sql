@@ -1,5 +1,5 @@
 -- Secure Lo-Fi Study Cafe
--- Security Engineering v4.0
+-- Security Engineering v4.2
 -- Self-hosted SQLite forensic and operational queries.
 --
 -- These queries target the local SQLite database owned by the self-hosted application.
@@ -18,6 +18,8 @@ SELECT
     route,
     request_id,
     session_ref,
+    client_ip,
+    user_agent,
     metadata
 FROM security_events
 WHERE severity = 'HIGH'
@@ -33,7 +35,9 @@ SELECT
     COALESCE(username_snapshot, 'anonymous') AS actor,
     route,
     request_id,
-    session_ref
+    session_ref,
+    client_ip,
+    user_agent
 FROM security_events
 WHERE outcome IN ('failed', 'blocked')
   AND created_at >= datetime('now', '-24 hours')
@@ -42,13 +46,14 @@ ORDER BY created_at DESC;
 -- 3. Authentication failure frequency by username snapshot.
 SELECT
     COALESCE(username_snapshot, 'anonymous') AS attempted_user,
+    client_ip,
     COUNT(*) AS failure_count,
     MIN(created_at) AS first_failure,
     MAX(created_at) AS last_failure
 FROM security_events
 WHERE event_type = 'auth.login_failed'
   AND created_at >= datetime('now', '-24 hours')
-GROUP BY COALESCE(username_snapshot, 'anonymous')
+GROUP BY COALESCE(username_snapshot, 'anonymous'), client_ip
 ORDER BY failure_count DESC, last_failure DESC;
 
 -- 4. Authorization denials.
@@ -59,7 +64,8 @@ SELECT
     outcome,
     route,
     request_id,
-    session_ref
+    session_ref,
+    client_ip
 FROM security_events
 WHERE event_type LIKE 'authorization.%'
 ORDER BY created_at DESC;
@@ -72,6 +78,8 @@ SELECT
     route,
     request_id,
     session_ref,
+    client_ip,
+    user_agent,
     metadata
 FROM security_events
 WHERE event_type = 'csrf.validation_failed'
@@ -88,6 +96,8 @@ SELECT
     http_method,
     route,
     request_id,
+    client_ip,
+    user_agent,
     metadata
 FROM security_events
 WHERE session_ref = 'REPLACE_WITH_SESSION_REF'
@@ -218,3 +228,31 @@ FROM security_events
 WHERE severity = 'HIGH'
 ORDER BY created_at DESC
 LIMIT 100;
+
+
+-- 16. Recent activity by client IP.
+SELECT
+    client_ip,
+    COUNT(*) AS event_count,
+    COUNT(DISTINCT COALESCE(username_snapshot, 'anonymous')) AS actor_count,
+    MIN(created_at) AS first_seen,
+    MAX(created_at) AS last_seen
+FROM security_events
+WHERE client_ip IS NOT NULL
+GROUP BY client_ip
+ORDER BY last_seen DESC, event_count DESC
+LIMIT 100;
+
+-- 17. Socket connect/disconnect history with network context.
+SELECT
+    created_at,
+    event_type,
+    COALESCE(username_snapshot, 'anonymous') AS actor,
+    client_ip,
+    user_agent,
+    session_ref,
+    metadata
+FROM security_events
+WHERE event_type IN ('socket.connected', 'socket.disconnected')
+ORDER BY created_at DESC
+LIMIT 200;
