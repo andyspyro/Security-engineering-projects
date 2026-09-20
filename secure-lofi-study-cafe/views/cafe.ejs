@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#120b0a">
   <title>Secure Lo-Fi Study Cafe</title>
   <link rel="stylesheet" href="/style.css">
@@ -11,9 +11,12 @@
   class="cafe-app"
   data-csrf="<%= csrfToken %>"
   data-user-id="<%= currentUserId %>"
+  data-username="<%= user.username %>"
   data-room-id="<%= roomId %>"
   data-can-moderate="<%= canModerate %>"
   data-can-assign="<%= canAssignTempAdmin %>"
+  data-mobile-active="room"
+  data-theme="espresso"
 >
   <header class="topbar app-topbar">
     <a class="brand-lockup brand-link" href="#cafe-floor" aria-label="Secure Lo-Fi Study Café home">
@@ -23,7 +26,7 @@
         <span class="steam steam-three"></span>
         <span class="coffee-cup">☕</span>
       </div>
-      <div>
+      <div class="brand-copy">
         <p class="eyebrow">Secure Study Room</p>
         <h1>Secure Lo-Fi Study Café</h1>
         <p class="session-line">
@@ -35,9 +38,10 @@
       </div>
     </a>
 
-    <div class="topbar-actions">
-      <a class="button ghost small" href="#music">Music</a>
+    <div class="topbar-actions desktop-topbar-actions">
+      <a class="button ghost small" href="#cafe-floor">Room</a>
       <a class="button ghost small" href="#study-chat">Chat</a>
+      <a class="button ghost small" href="#music">Music</a>
       <% if (canAssignTempAdmin) { %>
         <a class="button secondary small" href="/security">Security</a>
         <a class="button primary small" href="/admin">Admin Console</a>
@@ -47,11 +51,16 @@
         <button class="button secondary small" type="submit">Logout</button>
       </form>
     </div>
+
+    <div class="mobile-header-actions">
+      <span id="mobile-connection-dot" class="status-dot online" aria-hidden="true"></span>
+      <button id="mobile-more-button" class="icon-button" type="button" aria-label="Open profile and settings">☰</button>
+    </div>
   </header>
 
   <div class="app-frame">
     <aside class="app-sidebar" aria-label="Room navigation and profile">
-      <section class="sidebar-card room-summary-card">
+      <section class="sidebar-card room-summary-card desktop-sidebar-only">
         <p class="eyebrow">Current room</p>
         <div class="room-summary-title">
           <div>
@@ -66,13 +75,13 @@
             <span aria-hidden="true">⌂</span>
             <span>Café Floor</span>
           </a>
-          <a class="app-nav-link" href="#music">
-            <span aria-hidden="true">♫</span>
-            <span>Shared Music</span>
-          </a>
           <a class="app-nav-link" href="#study-chat">
             <span aria-hidden="true">◌</span>
-            <span>Study Chat</span>
+            <span>Live Chat</span>
+          </a>
+          <a class="app-nav-link" href="#music">
+            <span aria-hidden="true">♫</span>
+            <span>Music</span>
           </a>
           <a class="app-nav-link" href="#profile">
             <span aria-hidden="true">☺</span>
@@ -87,7 +96,7 @@
         </nav>
       </section>
 
-      <section id="profile" class="sidebar-card profile-card">
+      <section id="profile" class="sidebar-card profile-card mobile-view-card" data-mobile-panel="profile">
         <div class="sidebar-heading">
           <div>
             <p class="eyebrow">Your presence</p>
@@ -102,6 +111,8 @@
           <option value="chat">Available to chat</option>
           <option value="dnd">Do not disturb</option>
           <option value="afk">AFK</option>
+          <option value="listening">Listening</option>
+          <option value="watching">Watching</option>
         </select>
         <p id="availability-status-note" class="compact">Your status is shared with people in this room.</p>
 
@@ -123,9 +134,46 @@
           <button id="remove-profile-image" class="button ghost small" type="button">Remove</button>
         </div>
         <p id="profile-image-status" class="compact" aria-live="polite"></p>
+
+        <div class="section-rule"></div>
+
+        <div class="settings-grid">
+          <label>
+            <span class="field-label">Theme</span>
+            <select id="theme-select" class="status-select">
+              <option value="espresso">Espresso</option>
+              <option value="midnight">Midnight</option>
+              <option value="plum">Plum Night</option>
+            </select>
+          </label>
+
+          <label class="preference-toggle">
+            <input id="notification-preference" type="checkbox">
+            <span>
+              <strong>Room notifications</strong>
+              <small>Notify for mentions and timer completion when allowed.</small>
+            </span>
+          </label>
+        </div>
       </section>
 
-      <section class="sidebar-card connection-card">
+      <section class="sidebar-card focus-card mobile-view-card" data-mobile-panel="profile">
+        <div class="sidebar-heading">
+          <div>
+            <p class="eyebrow">Focus</p>
+            <h2>Pomodoro</h2>
+          </div>
+          <span id="focus-mode-badge" class="badge">25 min</span>
+        </div>
+        <div id="focus-timer-display" class="focus-timer-display" aria-live="polite">25:00</div>
+        <div class="focus-controls">
+          <button id="focus-start" class="button primary" type="button">Start</button>
+          <button id="focus-reset" class="button secondary" type="button">Reset</button>
+          <button id="focus-mode" class="button ghost" type="button">Switch to 5 min break</button>
+        </div>
+      </section>
+
+      <section class="sidebar-card connection-card mobile-view-card" data-mobile-panel="profile">
         <div class="sidebar-heading">
           <div>
             <p class="eyebrow">Connection</p>
@@ -141,15 +189,15 @@
     </aside>
 
     <main class="app-main">
-      <section id="cafe-floor" class="panel cafe-floor-panel room-hero">
+      <section id="cafe-floor" class="panel cafe-floor-panel room-hero mobile-view-card" data-mobile-panel="room">
         <div class="panel-heading floor-heading">
           <div>
             <p class="eyebrow">Live Room</p>
             <h2>Café Floor</h2>
-            <p class="panel-lead">Walk around, see who is here, and open a member card by selecting an avatar.</p>
+            <p class="panel-lead">Walk around, see who is here, and tap an avatar for a room-safe profile.</p>
           </div>
           <div class="floor-meta">
-            <span class="badge live">Connected</span>
+            <span class="badge live"><span class="presence-pulse" aria-hidden="true"></span>Connected</span>
             <span class="badge"><span id="inline-member-count">0</span> in room</span>
           </div>
         </div>
@@ -158,8 +206,10 @@
           id="avatar-stage"
           class="avatar-stage"
           tabindex="0"
-          aria-label="Interactive café floor. Hold arrow keys or WASD to walk, or click a destination."
+          aria-label="Interactive café floor. Hold arrow keys or WASD to walk, or tap a destination."
         >
+          <div class="ambient-glow ambient-glow-one" aria-hidden="true"></div>
+          <div class="ambient-glow ambient-glow-two" aria-hidden="true"></div>
           <div class="cafe-window" aria-hidden="true"><span class="window-moon"></span></div>
           <div class="floor-lamp floor-lamp-left" aria-hidden="true"></div>
           <div class="floor-lamp floor-lamp-right" aria-hidden="true"></div>
@@ -174,7 +224,7 @@
         <div class="floor-controls">
           <div class="floor-help">
             <strong>Move</strong>
-            <span>WASD / arrow keys / click a destination</span>
+            <span>WASD / arrow keys / tap a destination</span>
           </div>
 
           <div class="avatar-move-controls" aria-label="Move avatar">
@@ -188,12 +238,12 @@
         </div>
       </section>
 
-      <section id="music" class="panel music-panel">
+      <section id="music" class="panel music-panel mobile-view-card" data-mobile-panel="music">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Shared Music</p>
-            <h2>Room Player</h2>
-            <p class="panel-lead">Everyone can follow the shared room playback. Queue management remains permission-aware.</p>
+            <h2>Queue & Requests</h2>
+            <p class="panel-lead">Manage your room music without leaving chat. Playback itself stays in the Watch Together panel.</p>
           </div>
           <span id="controller-badge" class="badge">Synced Room</span>
         </div>
@@ -211,8 +261,6 @@
               </div>
             </div>
 
-            <div id="player" class="player-frame" aria-label="Shared YouTube player"></div>
-
             <div class="player-actions user-actions">
               <button id="sync-button" class="button primary" type="button">Sync to Room</button>
               <button id="independent-button" class="button secondary" type="button">Listen Independently</button>
@@ -221,7 +269,7 @@
 
             <div class="player-summary-row">
               <span>Votes: <strong id="vote-count">0/1</strong></span>
-              <span>Room members: <strong><span id="inline-member-count-mirror" aria-hidden="true">live</span></strong></span>
+              <span>Playback stays pinned in Chat.</span>
             </div>
 
             <% if (canModerate) { %>
@@ -232,7 +280,7 @@
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <button class="button secondary" type="submit">Play Next Track</button>
                   </form>
-                  <p class="compact">Approval, rejection, reordering, and removal tools are shown only to authorized moderators.</p>
+                  <p class="compact">Approval, rejection, reordering, and removal tools are restricted to authorized moderators.</p>
                 </div>
               </details>
             <% } %>
@@ -285,19 +333,69 @@
       </section>
     </main>
 
-    <aside id="study-chat" class="app-right-rail" aria-label="Chat and online members">
-      <section class="panel members-panel">
-        <div class="panel-heading compact-heading">
+    <aside id="study-chat" class="app-right-rail mobile-view-card" data-mobile-panel="chat" aria-label="Watch together, chat, and online members">
+      <section id="media-dock" class="panel media-dock" aria-label="Watch Together player">
+        <div class="media-dock-heading">
           <div>
-            <p class="eyebrow">Presence</p>
-            <h2>Members</h2>
+            <p class="eyebrow">Watch Together</p>
+            <h2 id="media-title">No video playing</h2>
           </div>
-          <span id="member-count" class="badge">0 online</span>
+          <button id="media-collapse" class="button ghost small" type="button" aria-expanded="true">Mini</button>
         </div>
-        <div id="members-list" class="members-list">
-          <div class="skeleton-row" aria-hidden="true"></div>
-          <div class="skeleton-row" aria-hidden="true"></div>
+
+        <div class="media-player-shell">
+          <div id="player" class="player-frame media-player" aria-label="Shared YouTube player"></div>
+          <button id="enable-playback" class="autoplay-gate" type="button" hidden>
+            Tap to enable synchronized playback
+          </button>
         </div>
+
+        <div class="media-meta">
+          <div>
+            <span id="media-requester">Requested by —</span>
+            <span id="media-sync-state" class="badge">Waiting for room state</span>
+          </div>
+          <div class="media-progress-row">
+            <div class="media-progress-track" aria-hidden="true">
+              <span id="media-progress-bar"></span>
+            </div>
+            <span id="media-progress-text">0:00 / 0:00</span>
+          </div>
+        </div>
+
+        <div class="media-quick-controls">
+          <button id="media-sync-button" class="button primary small" type="button">Sync</button>
+          <button id="media-vote-button" class="button secondary small" type="button">Vote Next</button>
+          <% if (canModerate) { %>
+            <form method="post" action="/admin/player/next">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="button secondary small" type="submit">Next</button>
+            </form>
+          <% } %>
+        </div>
+
+        <details class="media-queue-preview">
+          <summary>Queue preview</summary>
+          <div id="media-queue-preview" class="mini-queue-list">
+            <p class="muted">Queue is loading…</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel members-panel">
+        <details open class="members-details">
+          <summary class="panel-heading compact-heading">
+            <div>
+              <p class="eyebrow">Presence</p>
+              <h2>Members</h2>
+            </div>
+            <span id="member-count" class="badge">0 online</span>
+          </summary>
+          <div id="members-list" class="members-list">
+            <div class="skeleton-row" aria-hidden="true"></div>
+            <div class="skeleton-row" aria-hidden="true"></div>
+          </div>
+        </details>
       </section>
 
       <section class="panel chat-panel">
@@ -306,13 +404,27 @@
             <p class="eyebrow">Realtime</p>
             <h2>Study Chat</h2>
           </div>
-          <button id="minimize-chat" class="button ghost small" type="button">Minimize</button>
+          <div class="chat-heading-actions">
+            <span id="unread-badge" class="badge unread-badge" hidden>0 unread</span>
+            <button id="minimize-chat" class="button ghost small" type="button">Minimize</button>
+          </div>
         </div>
 
         <div id="chat-body" class="chat-body">
           <div id="chat-log" class="chat-log" aria-live="polite">
             <% [...messages].reverse().forEach((message) => { %>
-              <article class="message" data-message-id="<%= message.id %>">
+              <article
+                class="message"
+                data-message-id="<%= message.id %>"
+                data-message-user="<%= message.username %>"
+              >
+                <% if (message.reply_to_message_id && message.reply_message_text) { %>
+                  <div class="reply-preview">
+                    <strong>Replying to <%= message.reply_username || "message" %></strong>
+                    <span><%= message.reply_message_text %></span>
+                  </div>
+                <% } %>
+
                 <div class="message-meta">
                   <div class="message-author">
                     <span class="message-avatar" aria-hidden="true"><%= message.username.slice(0, 1).toUpperCase() %></span>
@@ -321,7 +433,32 @@
                   <span><%= new Date(message.created_at).toLocaleString() %></span>
                 </div>
 
-                <p><%= message.message_text %></p>
+                <p class="message-text"><%= message.message_text %></p>
+
+                <div class="message-reactions" data-reactions-for="<%= message.id %>">
+                  <% (message.reactions || []).forEach((reaction) => { %>
+                    <button
+                      class="reaction-chip"
+                      type="button"
+                      data-react-message="<%= message.id %>"
+                      data-react-emoji="<%= reaction.emoji %>"
+                    ><span><%= reaction.emoji %></span><strong><%= reaction.count %></strong></button>
+                  <% }) %>
+                </div>
+
+                <div class="message-inline-actions">
+                  <button class="message-reply-button" type="button" data-reply-message="<%= message.id %>">Reply</button>
+                  <div class="reaction-picker">
+                    <% ["☕", "💜", "👍", "✨", "😂"].forEach((emoji) => { %>
+                      <button
+                        type="button"
+                        aria-label="React <%= emoji %>"
+                        data-react-message="<%= message.id %>"
+                        data-react-emoji="<%= emoji %>"
+                      ><%= emoji %></button>
+                    <% }) %>
+                  </div>
+                </div>
 
                 <% if (canModerate) { %>
                   <details class="message-action-menu">
@@ -336,9 +473,19 @@
             <% }) %>
           </div>
 
+          <div id="typing-indicator" class="typing-indicator" aria-live="polite"></div>
+
+          <div id="reply-composer-banner" class="reply-composer-banner" hidden>
+            <div>
+              <strong id="reply-composer-title">Replying</strong>
+              <span id="reply-composer-text"></span>
+            </div>
+            <button id="reply-cancel" class="icon-button small-icon" type="button" aria-label="Cancel reply">×</button>
+          </div>
+
           <form id="chat-form" class="chat-form">
             <label class="sr-only" for="chat-input">Study message</label>
-            <input id="chat-input" maxlength="500" autocomplete="off" placeholder="Message the room…" required>
+            <input id="chat-input" maxlength="500" autocomplete="off" placeholder="Message the room… Use @name to mention someone." required>
             <button class="button primary" type="submit">Send</button>
           </form>
 
@@ -348,6 +495,32 @@
     </aside>
   </div>
 
+  <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+    <button class="mobile-nav-item is-active" type="button" data-mobile-target="room">
+      <span class="mobile-nav-icon" aria-hidden="true">⌂</span>
+      <span>Room</span>
+    </button>
+    <button class="mobile-nav-item" type="button" data-mobile-target="chat">
+      <span class="mobile-nav-icon" aria-hidden="true">◌</span>
+      <span>Chat</span>
+      <span id="mobile-unread-dot" class="mobile-unread-dot" hidden></span>
+    </button>
+    <button class="mobile-nav-item" type="button" data-mobile-target="music">
+      <span class="mobile-nav-icon" aria-hidden="true">♫</span>
+      <span>Music</span>
+    </button>
+    <button class="mobile-nav-item" type="button" data-mobile-target="profile">
+      <span class="mobile-nav-icon" aria-hidden="true">☺</span>
+      <span>Profile</span>
+    </button>
+    <% if (canAssignTempAdmin) { %>
+      <a class="mobile-nav-item" href="/admin">
+        <span class="mobile-nav-icon" aria-hidden="true">⚙</span>
+        <span>Admin</span>
+      </a>
+    <% } %>
+  </nav>
+
   <dialog id="member-profile-dialog" class="member-profile-dialog">
     <form method="dialog" class="dialog-close-row">
       <button class="icon-button" value="close" aria-label="Close member profile">×</button>
@@ -355,6 +528,7 @@
     <div id="member-profile-content"></div>
   </dialog>
 
+  <div id="join-leave-banner" class="join-leave-banner" role="status" aria-live="polite"></div>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
 
   <script src="/socket.io/socket.io.js"></script>
