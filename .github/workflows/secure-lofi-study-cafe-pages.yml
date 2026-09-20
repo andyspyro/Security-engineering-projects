@@ -1,12 +1,13 @@
-name: Deploy Secure Lo-Fi Study Cafe demo
+name: Deploy Secure Lo-Fi Study Cafe project page
 
 on:
   push:
     branches:
       - main
     paths:
-      - "secure-lofi-study-cafe/demo/**"
-      - "secure-lofi-study-cafe/public/style.css"
+      - "secure-lofi-study-cafe/README.md"
+      - "secure-lofi-study-cafe/SELF-HOSTING.md"
+      - "secure-lofi-study-cafe/SECURITY-ENGINEERING-REPORT-v5.0.md"
       - ".github/workflows/secure-lofi-study-cafe-pages.yml"
   workflow_dispatch:
 
@@ -30,12 +31,113 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Build static demo
+      - name: Build project landing page
         shell: bash
         run: |
           mkdir -p _site/secure-lofi-study-cafe
-          cp -R secure-lofi-study-cafe/demo/. _site/secure-lofi-study-cafe/
-          cp secure-lofi-study-cafe/public/style.css _site/secure-lofi-study-cafe/style.css
+
+          cat > _site/secure-lofi-study-cafe/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="description" content="Secure Lo-Fi Study Cafe self-hosted multi-user security engineering project">
+            <title>Secure Lo-Fi Study Cafe</title>
+            <style>
+              :root {
+                color-scheme: dark;
+                font-family: system-ui, sans-serif;
+                background: #120d0b;
+                color: #f7eee7;
+              }
+              body {
+                margin: 0;
+                min-height: 100vh;
+                display: grid;
+                place-items: center;
+                padding: 2rem;
+                box-sizing: border-box;
+              }
+              main {
+                width: min(900px, 100%);
+                background: #261914;
+                border: 1px solid #6f4a35;
+                border-radius: 24px;
+                padding: clamp(1.5rem, 4vw, 3rem);
+                box-shadow: 0 24px 70px #0008;
+              }
+              h1 { font-size: clamp(2rem, 6vw, 4rem); margin: 0 0 1rem; }
+              h2 { margin-top: 2rem; }
+              p, li { line-height: 1.65; }
+              code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+              pre {
+                overflow-x: auto;
+                background: #0d0a09;
+                border-radius: 16px;
+                padding: 1rem;
+                border: 1px solid #4c3428;
+              }
+              a { color: #ffbd66; }
+              .notice {
+                border-left: 4px solid #ffbd66;
+                background: #1a120f;
+                padding: 1rem 1.25rem;
+                border-radius: 12px;
+              }
+            </style>
+          </head>
+          <body>
+            <main>
+              <p><strong>Security Engineering Project</strong></p>
+              <h1>Secure Lo-Fi Study Cafe</h1>
+
+              <div class="notice">
+                <strong>This GitHub Pages site is documentation only.</strong>
+                GitHub Pages cannot run the Node.js backend, SQLite database, authenticated sessions, or Socket.IO server.
+                There are no browser-local demo accounts or simulated connected users on this page.
+              </div>
+
+              <h2>Production architecture</h2>
+              <pre>Browser / Phone
+                  │
+                  │ HTTPS + WebSocket
+                  ▼
+          Caddy / Cloudflare Tunnel
+                  │
+                  ▼
+          Node.js / Express / Socket.IO
+                  │
+                  ▼
+          Authentication + RBAC
+                  │
+                  ▼
+              SQLite WAL
+          users · rooms · sessions
+          presence · messages · logs</pre>
+
+              <p>
+                The real application is designed to run on a self-hosted Linux server.
+                All shared state is server-authoritative and persisted in SQLite.
+              </p>
+
+              <h2>What the backend implements</h2>
+              <ul>
+                <li>bcrypt password hashing and persistent server-side sessions</li>
+                <li>server-enforced administrator and regular-user RBAC</li>
+                <li>authenticated Socket.IO presence, reconnect handling, and multi-tab tracking</li>
+                <li>persistent rooms, memberships, messages, last-seen state, audit logs, and security events</li>
+                <li>CSRF protection, rate limiting, CSP, input validation, secure uploads, and narrow origin policy</li>
+                <li>systemd hardening, SQLite WAL backups, restore verification, and health checks</li>
+              </ul>
+
+              <p>
+                <a href="https://github.com/andyspyro/Security-engineering-projects/tree/main/secure-lofi-study-cafe">Source and deployment documentation on GitHub</a>
+              </p>
+            </main>
+          </body>
+          </html>
+          EOF
 
           cat > _site/index.html <<'EOF'
           <!doctype html>
@@ -47,7 +149,7 @@ jobs:
             <title>Secure Lo-Fi Study Cafe</title>
           </head>
           <body>
-            <p><a href="./secure-lofi-study-cafe/">Open the Secure Lo-Fi Study Cafe demo</a></p>
+            <p><a href="./secure-lofi-study-cafe/">Open Secure Lo-Fi Study Cafe project page</a></p>
           </body>
           </html>
           EOF
