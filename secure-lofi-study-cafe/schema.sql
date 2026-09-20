@@ -155,6 +155,8 @@ CREATE TABLE IF NOT EXISTS security_events (
     route TEXT,
     request_id TEXT,
     session_ref TEXT,
+    client_ip TEXT,
+    user_agent TEXT,
     metadata TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (actor_user_id) REFERENCES users(id),
@@ -177,6 +179,8 @@ CREATE INDEX IF NOT EXISTS idx_security_events_type
     ON security_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_security_events_actor
     ON security_events(actor_user_id);
+CREATE INDEX IF NOT EXISTS idx_security_events_client_ip
+    ON security_events(client_ip, created_at);
 CREATE INDEX IF NOT EXISTS idx_security_events_severity_outcome
     ON security_events(severity, outcome);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
