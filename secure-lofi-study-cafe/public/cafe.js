@@ -1401,7 +1401,7 @@
     const storedMediaPreference = localStorage.getItem("lofi.mediaCollapsed");
     const compactByDefault =
       storedMediaPreference === null &&
-      window.matchMedia("(max-width: 560px)").matches;
+      window.matchMedia("(max-width: 820px)").matches;
     const initialCollapsed =
       storedMediaPreference === "true" || compactByDefault;
 
