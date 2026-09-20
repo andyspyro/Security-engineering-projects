@@ -2864,6 +2864,8 @@ app.get(
                security_events.route,
                security_events.request_id,
                security_events.session_ref,
+               security_events.client_ip,
+               security_events.user_agent,
                security_events.metadata,
                security_events.created_at,
                actor.username AS actor_username,
@@ -2886,6 +2888,8 @@ app.get(
           content: JSON.stringify({
             requestId: row.request_id,
             sessionRef: row.session_ref,
+            clientIp: row.client_ip,
+            userAgent: row.user_agent,
             metadata: row.metadata
           }),
           status: row.outcome,
