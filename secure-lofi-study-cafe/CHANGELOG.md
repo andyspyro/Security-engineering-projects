@@ -1,5 +1,39 @@
 # Changelog
 
+## 4.2.0 — Realtime Performance & Admin Operations
+
+### Movement performance
+
+* Replaced full presence-list broadcasts during avatar movement with lightweight `member:moved` position deltas.
+* Movement updates use Socket.IO volatile delivery so stale positions are dropped instead of queued.
+* Added a server-side per-socket movement cap near 30 Hz.
+* Reduced client movement emit interval to approximately 45 ms while keeping local rendering on requestAnimationFrame.
+* Remote browsers update only the matching avatar instead of rebuilding the full room.
+* Reused unchanged avatar/profile-image DOM to reduce unnecessary image and layout work.
+* Tightened remote interpolation timing.
+
+### Network diagnostics
+
+* Added authenticated realtime `client:ping` acknowledgements.
+* Added a live round-trip latency badge in the café UI.
+
+### Admin operations
+
+* Added online-user, live-socket, active-session, and failed-login counts.
+* Added runtime health cards for Node version, uptime, RSS memory, PID, listen address, SQLite journal mode, proxy mode, public origin, and database path.
+* Added active session inventory using safe HMAC-derived session references.
+* Added realtime presence-session history.
+* Added client IP and user-agent fields to security telemetry.
+* Added IP/user-agent fields to administrator CSV exports.
+* Added safe current-cookie metadata while intentionally withholding raw cookie/session credentials.
+* Added administrator session revocation for other accounts.
+
+### Documentation
+
+* Added `HOSTING-COMMANDS.md`.
+* Added `PERFORMANCE-ADMIN-OPS-v4.2.md`.
+* Updated the main README for hosting commands, movement performance, and admin operations.
+
 ## 4.1.0 — Production Multi-User Backend
 
 ### Shared backend
