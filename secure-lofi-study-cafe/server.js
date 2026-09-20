@@ -14,6 +14,7 @@ const db = require("./database");
 const SQLiteSessionStore = require("./sqlite-session-store");
 const RoomPresence = require("./services/room-presence");
 const createApiRouter = require("./routes/api");
+const createOriginPolicy = require("./security/origin-policy");
 
 const app = express();
 
@@ -39,30 +40,10 @@ const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const DEFAULT_ROOM_ID = db.DEFAULT_ROOM_ID || 1;
 
-const configuredOrigins = new Set(
-  [
-    process.env.PUBLIC_ORIGIN,
-    ...(process.env.ALLOWED_ORIGINS || "")
-      .split(",")
-      .map((value) => value.trim())
-  ].filter(Boolean)
-);
-
-function isAllowedRealtimeOrigin(origin, host) {
-  if (!origin) {
-    return true;
-  }
-
-  if (configuredOrigins.size > 0) {
-    return configuredOrigins.has(origin);
-  }
-
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
+const originPolicy = createOriginPolicy({
+  publicOrigin: process.env.PUBLIC_ORIGIN,
+  allowedOrigins: process.env.ALLOWED_ORIGINS
+});
 
 if (!SESSION_SECRET) {
   throw new Error("SESSION_SECRET is required. Copy .env.example to .env and set a random value.");
@@ -451,7 +432,7 @@ io.use((socket, next) => {
   const origin = socket.handshake.headers.origin;
   const host = socket.handshake.headers.host;
 
-  if (!isAllowedRealtimeOrigin(origin, host)) {
+  if (!originPolicy.isAllowed(origin, host)) {
     return next(new Error("origin not allowed"));
   }
 
@@ -1351,6 +1332,7 @@ function updateMemberStatus(userId, updates) {
 
 app.use(
   "/api",
+  originPolicy.apiMiddleware,
   createApiRouter({
     db,
     io,
