@@ -492,8 +492,8 @@ function verifyCsrf(req, res, next) {
    Access control
 ------------------------- */
 
-function requireLogin(req, res, next) {
-  if (!req.session.user) {
+async function requireLogin(req, res, next) {
+  if (!req.session.user || !req.session.user.id) {
     recordRequestSecurityEvent(
       req,
       "authorization.authentication_required",
@@ -504,7 +504,30 @@ function requireLogin(req, res, next) {
     return res.redirect("/login");
   }
 
-  next();
+  try {
+    const user = await db.get(
+      "SELECT id, username, role FROM users WHERE id = ?",
+      [req.session.user.id]
+    );
+
+    if (!user) {
+      return req.session.destroy(() => {
+        res.redirect("/login");
+      });
+    }
+
+    req.session.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role
+    };
+    res.locals.user = req.session.user;
+
+    next();
+  } catch (err) {
+    console.error("Authorization identity refresh failed:", err);
+    res.status(500).send("Unexpected server failure.");
+  }
 }
 
 function isPermanentAdmin(user) {
