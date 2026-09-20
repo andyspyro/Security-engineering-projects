@@ -164,8 +164,40 @@
     return { item, actions };
   }
 
+  function renderMediaQueuePreview(queue = []) {
+    if (!mediaQueuePreview) {
+      return;
+    }
+
+    mediaQueuePreview.replaceChildren();
+
+    if (!queue.length) {
+      mediaQueuePreview.appendChild(emptyState("Queue is empty."));
+      return;
+    }
+
+    queue.slice(0, 3).forEach((track, index) => {
+      const row = document.createElement("div");
+      row.className = "mini-queue-row";
+
+      const number = document.createElement("span");
+      number.className = "mini-queue-number";
+      number.textContent = String(index + 1);
+
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = track.title;
+      const requester = document.createElement("span");
+      requester.textContent = "by " + (track.requested_by_username || "unknown");
+
+      copy.append(title, requester);
+      row.append(number, copy);
+      mediaQueuePreview.appendChild(row);
+    });
+  }
   function renderQueue(queue = []) {
     queueList.replaceChildren();
+    renderMediaQueuePreview(queue);
 
     if (!queue.length) {
       queueList.appendChild(emptyState("Nothing is queued yet."));
