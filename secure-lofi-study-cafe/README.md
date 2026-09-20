@@ -1,15 +1,15 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 4.0.1  
+> **Release:** 4.1.0  
 > **Type:** self-hosted secure realtime web application  
 > **Runtime:** Node.js 24 LTS, Express, EJS, Socket.IO  
 > **Persistence:** self-hosted SQLite in WAL mode  
 > **Service manager:** systemd  
 > **Security focus:** authentication, RBAC, CSRF, session security, host hardening, SQL telemetry, audit logging, backups, incident reconstruction
 
-## What changed in v4.0
+## What changed in v4.1
 
-Version 4.0 removes the requirement for a hosted backend/database provider.
+Version 4.1 is the production multi-user architecture: authenticated JSON APIs, persistent rooms/memberships/presence history, server-authoritative Socket.IO presence, explicit reconnect synchronization, narrow origin policy, server-side RBAC, and self-hosted SQLite persistence.
 
 The full application is designed to run on a Linux machine you control:
 
@@ -132,7 +132,7 @@ Do not port-forward Node port 3000 directly to the public Internet.
 
 ## SQLite security and durability
 
-Version 4.0 enables:
+Version 4.1 uses:
 
 ```sql
 PRAGMA foreign_keys = ON;
@@ -315,6 +315,33 @@ It contains investigation queries for:
 * index inspection;
 * query-plan analysis.
 
+## API and realtime architecture
+
+The production app combines authoritative API state with incremental realtime events.
+
+Key API routes include:
+
+```text
+GET  /api/health
+GET  /api/auth/me
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+GET  /api/rooms
+GET  /api/rooms/:roomId
+GET  /api/rooms/:roomId/members
+POST /api/rooms/:roomId/join
+POST /api/rooms/:roomId/leave
+GET  /api/rooms/:roomId/messages
+POST /api/rooms/:roomId/messages
+GET  /api/admin/users
+PATCH /api/admin/users/:userId/role
+```
+
+Realtime state includes authoritative room snapshots, presence updates, join/leave events, chat events, player state, and reconnect synchronization. Socket identity comes from the server-side Express session rather than a browser-supplied username or role.
+
+Persistent room/presence schema includes `rooms`, `room_memberships`, `user_profiles`, and `presence_sessions`.
+
 ## Realtime café features
 
 * shared account registration/login;
@@ -389,7 +416,8 @@ With both clients connected to the same self-hosted server, each should see the 
 | [deploy/scripts/security-audit.sh](deploy/scripts/security-audit.sh) | host/application security verification |
 | [SELF-HOSTING.md](SELF-HOSTING.md) | full operations runbook |
 | [SECURITY-ENGINEERING-REPORT-v4.0.md](SECURITY-ENGINEERING-REPORT-v4.0.md) | v4 architecture/security report |
-| [REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md](REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md) | realtime root cause, repair, and two-session validation |
+| [REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md](REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md) | realtime root cause and first two-session repair |
+| [PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md](PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md) | final v4.1 architecture, API, presence, RBAC, test matrix, deployment acceptance criteria |
 | [CHANGELOG.md](CHANGELOG.md) | release history |
 
 ## CI validation
@@ -406,6 +434,9 @@ GitHub Actions uses Node.js 24 LTS and checks:
 * security-event queries;
 * SQLite quick_check;
 * query plans;
+* origin policy validation;
+* real two-session Socket.IO presence/RBAC test;
+* multi-client disconnect/reconnect/logout/restart integration test;
 * production Docker build.
 
 Run locally:
