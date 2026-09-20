@@ -1,15 +1,15 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 4.1.0  
+> **Release:** 4.2.0  
 > **Type:** self-hosted secure realtime web application  
 > **Runtime:** Node.js 24 LTS, Express, EJS, Socket.IO  
 > **Persistence:** self-hosted SQLite in WAL mode  
 > **Service manager:** systemd  
 > **Security focus:** authentication, RBAC, CSRF, session security, host hardening, SQL telemetry, audit logging, backups, incident reconstruction
 
-## What changed in v4.1
+## What changed in v4.2
 
-Version 4.1 is the production multi-user architecture: authenticated JSON APIs, persistent rooms/memberships/presence history, server-authoritative Socket.IO presence, explicit reconnect synchronization, narrow origin policy, server-side RBAC, and self-hosted SQLite persistence.
+Version 4.2 keeps the production multi-user architecture and improves realtime movement performance, network diagnostics, security telemetry, and permanent-admin operations.
 
 The full application is designed to run on a Linux machine you control:
 
@@ -34,6 +34,24 @@ your server
 This is the deployment where an administrator on one device and a normal user such as `bunny` on another device use the same account database, room presence, chat, moderation state, and security logs.
 
 The GitHub Pages build remains a static interface showcase only. It is not the authoritative multi-user backend.
+
+## Hosting command
+
+If a hosting provider asks for the process **Start Command**, use:
+
+```text
+npm start
+```
+
+That runs `node server.js`.
+
+For the permanent self-hosted Linux service:
+
+```bash
+sudo systemctl enable --now secure-lofi-study-cafe
+```
+
+See [HOSTING-COMMANDS.md](HOSTING-COMMANDS.md) for temporary, raw Node, systemd, restart, status, and log commands.
 
 ## Start a real public test immediately
 
@@ -357,6 +375,30 @@ Realtime state includes authoritative room snapshots, presence updates, join/lea
 
 Persistent room/presence schema includes `rooms`, `room_memberships`, `user_profiles`, and `presence_sessions`.
 
+## v4.2 realtime performance
+
+Avatar movement now uses lightweight volatile position deltas rather than broadcasting and rebuilding the entire presence list for every movement packet.
+
+The moving browser renders locally at animation-frame speed. Remote browsers receive `member:moved` updates and update only the matching avatar. The server caps inbound movement processing near 30 Hz and the client emits roughly every 45 ms.
+
+The café also displays a live Socket.IO round-trip latency estimate.
+
+## v4.2 admin operations
+
+The permanent-admin console now adds:
+
+* online-user, live-socket, active-session, and failed-login counts;
+* current client IP and browser user-agent;
+* safe HMAC-derived session references;
+* cookie flags without revealing the raw cookie;
+* active server-side sessions;
+* realtime presence connection history;
+* Node uptime, memory, PID, listen address, proxy mode, public origin, database path, and SQLite journal mode;
+* IP/user-agent fields in security-event telemetry and CSV exports;
+* a **Revoke Sessions** control for invalidating another user's sessions and live sockets.
+
+See [PERFORMANCE-ADMIN-OPS-v4.2.md](PERFORMANCE-ADMIN-OPS-v4.2.md).
+
 ## Realtime café features
 
 * shared account registration/login;
@@ -426,6 +468,7 @@ With both clients connected to the same self-hosted server, each should see the 
 | [deploy/README.md](deploy/README.md) | deployment asset map |
 | [deploy/scripts/start-free-public-test.sh](deploy/scripts/start-free-public-test.sh) | one-command real public multi-device test |
 | [START-NOW.md](START-NOW.md) | shortest path to a free public test URL |
+| [HOSTING-COMMANDS.md](HOSTING-COMMANDS.md) | exact start, systemd, restart, status, and log commands |
 | [deploy/scripts/install-self-hosted.sh](deploy/scripts/install-self-hosted.sh) | interactive hardened installer |
 | [deploy/systemd/secure-lofi-study-cafe.service](deploy/systemd/secure-lofi-study-cafe.service) | systemd service sandbox |
 | [deploy/scripts/backup-sqlite.sh](deploy/scripts/backup-sqlite.sh) | online verified backups |
@@ -434,7 +477,8 @@ With both clients connected to the same self-hosted server, each should see the 
 | [SELF-HOSTING.md](SELF-HOSTING.md) | full operations runbook |
 | [SECURITY-ENGINEERING-REPORT-v4.0.md](SECURITY-ENGINEERING-REPORT-v4.0.md) | v4 architecture/security report |
 | [REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md](REALTIME-PRESENCE-INCIDENT-REPORT-v4.0.1.md) | realtime root cause and first two-session repair |
-| [PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md](PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md) | final v4.1 architecture, API, presence, RBAC, test matrix, deployment acceptance criteria |
+| [PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md](PRODUCTION-MULTI-USER-IMPLEMENTATION-v4.1.md) | production architecture, API, presence, RBAC, test matrix, deployment acceptance criteria |
+| [PERFORMANCE-ADMIN-OPS-v4.2.md](PERFORMANCE-ADMIN-OPS-v4.2.md) | movement optimization, latency diagnostics, admin session/network operations |
 | [CHANGELOG.md](CHANGELOG.md) | release history |
 
 ## CI validation
