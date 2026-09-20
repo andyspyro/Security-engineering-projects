@@ -1971,6 +1971,187 @@
     }
   }, 5000);
 
+  setInterval(() => {
+    if (!player || !youtubeReady || !mediaProgressText || !mediaProgressBar) {
+      return;
+    }
+
+    try {
+      const current = Math.max(0, Number(player.getCurrentTime() || 0));
+      const duration = Math.max(0, Number(player.getDuration() || 0));
+      const percent = duration > 0
+        ? Math.min(100, (current / duration) * 100)
+        : 0;
+
+      mediaProgressBar.style.width = percent + "%";
+      mediaProgressText.textContent =
+        formatClock(current) + " / " + formatClock(duration);
+    } catch {
+      // Player may be transitioning between videos.
+    }
+  }, 1000);
+
+  function setMobileView(target) {
+    const allowed = new Set(["room", "chat", "music", "profile"]);
+    const selected = allowed.has(target) ? target : "room";
+
+    body.dataset.mobileActive = selected;
+
+    document.querySelectorAll("[data-mobile-target]").forEach((button) => {
+      const active = button.dataset.mobileTarget === selected;
+      button.classList.toggle("is-active", active);
+      if (active) {
+        button.setAttribute("aria-current", "page");
+      } else {
+        button.removeAttribute("aria-current");
+      }
+    });
+
+    if (selected === "chat") {
+      unreadCount = 0;
+      updateUnread(0);
+      requestAnimationFrame(() => {
+        chatLog.scrollTop = chatLog.scrollHeight;
+      });
+    }
+
+    if (window.matchMedia("(max-width: 820px)").matches) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  document.querySelectorAll("[data-mobile-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setMobileView(button.dataset.mobileTarget);
+    });
+  });
+
+  if (mobileMoreButton) {
+    mobileMoreButton.addEventListener("click", () => {
+      setMobileView("profile");
+    });
+  }
+
+  const savedTheme = localStorage.getItem("lofi.theme") || "espresso";
+  body.dataset.theme = ["espresso", "midnight", "plum"].includes(savedTheme)
+    ? savedTheme
+    : "espresso";
+
+  if (themeSelect) {
+    themeSelect.value = body.dataset.theme;
+    themeSelect.addEventListener("change", () => {
+      body.dataset.theme = themeSelect.value;
+      localStorage.setItem("lofi.theme", themeSelect.value);
+    });
+  }
+
+  if (notificationPreference) {
+    notificationPreference.checked =
+      localStorage.getItem("lofi.notifications") === "true";
+
+    notificationPreference.addEventListener("change", async () => {
+      if (
+        notificationPreference.checked &&
+        "Notification" in window &&
+        Notification.permission === "default"
+      ) {
+        const permission = await Notification.requestPermission();
+        notificationPreference.checked = permission === "granted";
+      }
+
+      localStorage.setItem(
+        "lofi.notifications",
+        String(notificationPreference.checked)
+      );
+    });
+  }
+
+  function renderFocusTimer() {
+    if (!focusDisplay) {
+      return;
+    }
+
+    focusDisplay.textContent = formatClock(focusRemainingSeconds);
+    if (focusModeBadge) {
+      focusModeBadge.textContent = focusIsBreak ? "5 min break" : "25 min";
+    }
+    if (focusMode) {
+      focusMode.textContent = focusIsBreak
+        ? "Switch to 25 min focus"
+        : "Switch to 5 min break";
+    }
+  }
+
+  function stopFocusTimer() {
+    if (focusTimerId) {
+      clearInterval(focusTimerId);
+      focusTimerId = null;
+    }
+
+    if (focusStart) {
+      focusStart.textContent = "Start";
+    }
+  }
+
+  if (focusStart) {
+    focusStart.addEventListener("click", () => {
+      if (focusTimerId) {
+        stopFocusTimer();
+        return;
+      }
+
+      focusStart.textContent = "Pause";
+      focusTimerId = setInterval(() => {
+        focusRemainingSeconds -= 1;
+        renderFocusTimer();
+
+        if (focusRemainingSeconds <= 0) {
+          stopFocusTimer();
+          const completedWasBreak = focusIsBreak;
+          focusRemainingSeconds = focusIsBreak ? 5 * 60 : 25 * 60;
+          renderFocusTimer();
+          showToast(
+            completedWasBreak
+              ? "Break complete. Ready to focus?"
+              : "Focus session complete. Take a break.",
+            "success"
+          );
+
+          if (
+            notificationPreference &&
+            notificationPreference.checked &&
+            "Notification" in window &&
+            Notification.permission === "granted"
+          ) {
+            new Notification("Secure Lo-Fi Study Café", {
+              body: completedWasBreak
+                ? "Break complete."
+                : "Focus session complete."
+            });
+          }
+        }
+      }, 1000);
+    });
+  }
+
+  if (focusReset) {
+    focusReset.addEventListener("click", () => {
+      stopFocusTimer();
+      focusRemainingSeconds = focusIsBreak ? 5 * 60 : 25 * 60;
+      renderFocusTimer();
+    });
+  }
+
+  if (focusMode) {
+    focusMode.addEventListener("click", () => {
+      stopFocusTimer();
+      focusIsBreak = !focusIsBreak;
+      focusRemainingSeconds = focusIsBreak ? 5 * 60 : 25 * 60;
+      renderFocusTimer();
+    });
+  }
+
+  renderFocusTimer();
   fetch("/api/player-state", {
     headers: {
       Accept: "application/json"
