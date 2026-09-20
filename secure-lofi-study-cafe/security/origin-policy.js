@@ -83,9 +83,15 @@ function createOriginPolicy({
     next();
   }
 
+  function isConfigured(origin) {
+    const normalized = normalizeOrigin(origin);
+    return Boolean(normalized && configured.has(normalized));
+  }
+
   return {
     configuredOrigins: configured,
     isAllowed,
+    isConfigured,
     apiMiddleware
   };
 }
