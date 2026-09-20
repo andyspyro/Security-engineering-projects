@@ -63,7 +63,7 @@
   let isWalking = false;
 
   const WALK_SPEED = 24;
-  const MOVE_EMIT_INTERVAL_MS = 90;
+  const MOVE_EMIT_INTERVAL_MS = 45;
   const PROFILE_IMAGE_MAX_BYTES = 512 * 1024;
 
   function addCsrf(form) {
@@ -197,6 +197,15 @@
   }
 
   function setAvatarFace(face, member, style) {
+    const faceKey = member.avatarImageUrl
+      ? `image:${member.avatarImageUrl}`
+      : `style:${style}`;
+
+    if (face.dataset.faceKey === faceKey) {
+      return;
+    }
+
+    face.dataset.faceKey = faceKey;
     face.replaceChildren();
 
     if (member.avatarImageUrl) {
@@ -314,6 +323,47 @@
     });
   }
 
+  function applyRemoteAvatarMove(payload) {
+    if (!payload || Number(payload.userId) === currentUserId) {
+      return;
+    }
+
+    const member = latestMembers.find(
+      (candidate) => Number(candidate.id) === Number(payload.userId)
+    );
+
+    if (!member) {
+      return;
+    }
+
+    const x = Math.min(92, Math.max(8, Number(payload.x)));
+    const y = Math.min(92, Math.max(8, Number(payload.y)));
+
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+
+    member.avatarX = x;
+    member.avatarY = y;
+
+    const avatar = avatarLayer
+      ? avatarLayer.querySelector(
+          `[data-user-id="${String(payload.userId)}"]`
+        )
+      : null;
+
+    if (avatar) {
+      avatar.style.left = `${x}%`;
+      avatar.style.top = `${y}%`;
+      avatar.classList.add("is-network-moving");
+
+      clearTimeout(avatar._networkMoveTimer);
+      avatar._networkMoveTimer = setTimeout(() => {
+        avatar.classList.remove("is-network-moving");
+      }, 140);
+    }
+  }
+
   function setSpeechBubble(username, message) {
     const cleanText = String(message || "").trim().slice(0, 120);
 
@@ -361,7 +411,7 @@
       now - lastMovementEmit >= MOVE_EMIT_INTERVAL_MS
     ) {
       lastMovementEmit = now;
-      socket.emit("member:move", {
+      socket.volatile.emit("member:move", {
         x: member.avatarX,
         y: member.avatarY
       });
@@ -1150,6 +1200,10 @@
 
   socket.on("presence:update", ({ members }) => {
     renderMembers(members || []);
+  });
+
+  socket.on("member:moved", (payload) => {
+    applyRemoteAvatarMove(payload);
   });
 
   socket.on("requests:update", ({ pendingRequests }) => {
