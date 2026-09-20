@@ -315,13 +315,40 @@ async function main() {
   );
 
   const adminSocket = await connectSocket(admin);
-  const adminSnapshotPromise = waitForEvent(
-    adminSocket,
-    "room:snapshot",
-    (snapshot) => Array.isArray(snapshot.members)
+
+  const adminSnapshot = await new Promise((resolve, reject) => {
+    adminSocket
+      .timeout(5000)
+      .emit("room:sync-request", (error, response) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        if (
+          !response ||
+          !response.ok ||
+          !response.snapshot ||
+          !Array.isArray(response.snapshot.members)
+        ) {
+          reject(
+            new Error(
+              "Admin did not receive an authoritative room snapshot."
+            )
+          );
+          return;
+        }
+
+        resolve(response.snapshot);
+      });
+  });
+
+  assert(
+    adminSnapshot.members.some(
+      (member) => member.username === adminUsername
+    ),
+    "Admin room snapshot did not contain the admin."
   );
-  adminSocket.emit("room:sync-request", () => {});
-  await adminSnapshotPromise;
 
   const bunnyAppears = waitForEvent(
     adminSocket,
