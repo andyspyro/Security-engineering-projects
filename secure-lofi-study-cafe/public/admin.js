@@ -6,6 +6,11 @@
   const inspectorContent = document.getElementById(
     "admin-user-inspector-content"
   );
+  const liveStream = document.getElementById("admin-live-stream");
+  const realtimeStatus = document.getElementById("admin-realtime-status");
+  const onlineCount = document.getElementById("admin-online-count");
+  const socketCount = document.getElementById("admin-socket-count");
+  const adminLatency = document.getElementById("admin-latency");
 
   const rows = Array.from(document.querySelectorAll("[data-admin-row]"));
   const sections = Array.from(document.querySelectorAll("[data-admin-section]"));
@@ -213,4 +218,97 @@
       }
     });
   });
+
+  function appendLiveEvent(event) {
+    if (!liveStream || !event) {
+      return;
+    }
+
+    liveStream.querySelector(".admin-live-empty")?.remove();
+
+    const row = document.createElement("article");
+    row.className = "admin-live-row";
+
+    const time = document.createElement("time");
+    time.textContent = new Date(
+      event.createdAt || Date.now()
+    ).toLocaleTimeString();
+
+    const type = document.createElement("code");
+    type.textContent = String(event.type || "event");
+
+    const copy = document.createElement("span");
+    copy.textContent = String(event.message || "Activity received.");
+
+    row.append(time, type, copy);
+    liveStream.prepend(row);
+
+    while (liveStream.children.length > 100) {
+      liveStream.lastElementChild?.remove();
+    }
+  }
+
+  if (typeof io === "function") {
+    const socket = io({
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 5000,
+      timeout: 10000
+    });
+
+    socket.on("connect", () => {
+      if (realtimeStatus) {
+        realtimeStatus.textContent = "Live";
+        realtimeStatus.classList.add("live");
+      }
+    });
+
+    socket.on("disconnect", () => {
+      if (realtimeStatus) {
+        realtimeStatus.textContent = "Reconnecting";
+        realtimeStatus.classList.remove("live");
+      }
+    });
+
+    socket.on("presence:update", ({ members }) => {
+      const safeMembers = Array.isArray(members) ? members : [];
+
+      if (onlineCount) {
+        onlineCount.textContent = String(safeMembers.length);
+      }
+
+      if (socketCount) {
+        const total = safeMembers.reduce(
+          (sum, member) => sum + Number(member.connectionCount || 0),
+          0
+        );
+        socketCount.textContent = String(total);
+      }
+    });
+
+    socket.on("admin:activity", (event) => {
+      appendLiveEvent(event);
+    });
+
+    setInterval(() => {
+      if (!socket.connected || !adminLatency) {
+        return;
+      }
+
+      const started = performance.now();
+
+      socket
+        .timeout(3000)
+        .emit("client:ping", (error) => {
+          if (error) {
+            adminLatency.textContent = "timeout";
+            return;
+          }
+
+          adminLatency.textContent =
+            Math.max(0, Math.round(performance.now() - started)) + " ms";
+        });
+    }, 5000);
+  }
 })();
