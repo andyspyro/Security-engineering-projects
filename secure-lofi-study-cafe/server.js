@@ -86,6 +86,7 @@ const tempModeratorIds = new Set();
 const nextVotes = new Map();
 
 const AVATAR_STYLES = ["latte", "mocha", "matcha", "berry", "sky", "lavender"];
+const AVAILABILITY_STATUSES = new Set(["studying", "chat", "dnd", "afk"]);
 const PROFILE_IMAGE_MAX_BYTES = 512 * 1024;
 const PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -1292,7 +1293,8 @@ async function addSocketToPresence(socket, user) {
   const profile = await db.get(
     `
     SELECT users.avatar_image,
-           user_profiles.avatar_style
+           user_profiles.avatar_style,
+           user_profiles.availability_status
     FROM users
     LEFT JOIN user_profiles ON user_profiles.user_id = users.id
     WHERE users.id = ?
@@ -1309,6 +1311,10 @@ async function addSocketToPresence(socket, user) {
         profile && AVATAR_STYLES.includes(profile.avatar_style)
           ? profile.avatar_style
           : avatar.avatarStyle,
+      availabilityStatus:
+        profile && AVAILABILITY_STATUSES.has(profile.availability_status)
+          ? profile.availability_status
+          : "studying",
       avatarX: avatar.avatarX,
       avatarY: avatar.avatarY
     },
@@ -3263,6 +3269,54 @@ io.on("connection", async (socket) => {
         y: member.avatarY,
         serverNow: now
       });
+  });
+
+  socket.on("member:availability", async (data, acknowledge) => {
+    const reply = typeof acknowledge === "function" ? acknowledge : () => {};
+
+    try {
+      if (!data || data.csrfToken !== userSession.csrfToken) {
+        reply({ ok: false, error: "Invalid security token." });
+        return;
+      }
+
+      const requested = String(data.status || "").trim().toLowerCase();
+      if (!AVAILABILITY_STATUSES.has(requested)) {
+        reply({ ok: false, error: "Invalid availability status." });
+        return;
+      }
+
+      const member = onlineUsers.get(user.id);
+      if (!member) {
+        reply({ ok: false, error: "User is not active in the room." });
+        return;
+      }
+
+      member.availabilityStatus = requested;
+      member.updatedAt = Date.now();
+
+      await db.run(
+        `
+        UPDATE user_profiles
+        SET availability_status = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+        `,
+        [requested, user.id]
+      );
+
+      await writeAudit(
+        user.id,
+        "profile.availability",
+        `Changed availability status to ${requested}`
+      );
+
+      emitPresence();
+      reply({ ok: true, status: requested });
+    } catch (err) {
+      console.error("Availability status update failed:", err);
+      reply({ ok: false, error: "Could not update status." });
+    }
   });
 
   socket.on("member:avatar", async (data) => {
