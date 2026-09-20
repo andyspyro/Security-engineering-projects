@@ -3132,6 +3132,14 @@ io.on("connection", async (socket) => {
     console.error("Initial room synchronization error:", err);
   }
 
+  socket.on("client:ping", (acknowledge) => {
+    if (typeof acknowledge === "function") {
+      acknowledge({
+        serverNow: Date.now()
+      });
+    }
+  });
+
   socket.on("room:sync-request", async (acknowledge) => {
     const reply =
       typeof acknowledge === "function" ? acknowledge : () => {};
