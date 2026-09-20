@@ -31,18 +31,15 @@ Both devices must use the same generated `https://...trycloudflare.com` URL.
 ## Requirements
 
 * WSL/Linux shell
-* Node.js 24 LTS
-* npm
 * Internet access
 
-Check:
+The launcher now bootstraps missing runtime dependencies automatically:
 
-```bash
-node --version
-npm --version
-```
+* Node.js 24 LTS through nvm;
+* npm with Node.js;
+* a user-local `cloudflared` binary for the public tunnel.
 
-The Node version must begin with `v24.`.
+If Node.js 24 is already installed, the launcher reuses it.
 
 ## One-command launcher
 
@@ -55,14 +52,16 @@ bash deploy/scripts/start-free-public-test.sh
 
 The launcher will:
 
-1. install npm dependencies if needed;
-2. create the local persistent data directory;
-3. securely prompt for the permanent-admin username/password;
-4. generate a random session secret;
-5. start the real backend on localhost;
-6. wait for the database-aware healthcheck;
-7. start a free Cloudflare Quick Tunnel;
-8. print the public HTTPS URL.
+1. install/activate Node.js 24 LTS with nvm when necessary;
+2. install a user-local Cloudflare Tunnel client when necessary;
+3. install npm dependencies if needed;
+4. create the local persistent data directory;
+5. securely prompt for the permanent-admin username/password;
+6. generate a random session secret;
+7. start the real backend on localhost;
+8. wait for the database-aware healthcheck;
+9. start a free Cloudflare Quick Tunnel;
+10. print the public HTTPS URL.
 
 The password is entered without terminal echo and is not written to GitHub.
 
