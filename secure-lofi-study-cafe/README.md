@@ -1,6 +1,6 @@
 # Secure Lo-Fi Study Cafe
 
-> **Release:** 6.0.0  
+> **Release:** 6.2.0  
 > **Type:** self-hosted secure realtime web application  
 > **Runtime:** Node.js 24 LTS, Express, EJS, Socket.IO  
 > **Persistence:** self-hosted SQLite in WAL mode  
@@ -68,6 +68,63 @@ Realtime remote movement now interpolates between server-accepted coordinates on
 Normal member cards expose room-safe information only. The permanent-admin console keeps IP/session/runtime/security telemetry separated behind server-side authorization.
 
 See [PRODUCTION-UI-UX-REDESIGN-v5.0.md](PRODUCTION-UI-UX-REDESIGN-v5.0.md).
+
+## WSL quick host reminder
+
+If you forget how to start the real café from Windows Subsystem for Linux (WSL), use this.
+
+### Public test from WSL — computer + phone + friends
+
+Open WSL, then run:
+
+```bash
+cd ~/Security-engineering-projects/secure-lofi-study-cafe
+git pull origin main
+bash deploy/scripts/start-free-public-test.sh
+```
+
+The script will:
+
+1. start the real Node.js / Express / Socket.IO server;
+2. use the persistent SQLite database in the project;
+3. ask for the permanent admin username and password;
+4. start a temporary Cloudflare Quick Tunnel;
+5. print a public HTTPS address similar to:
+
+```text
+https://random-words.trycloudflare.com
+```
+
+Use the **same newly generated URL** on the computer, phone, tablet, or another user's device.
+
+Keep the WSL terminal open while the café is running.
+
+To stop the server and tunnel:
+
+```text
+Ctrl+C
+```
+
+A Cloudflare Quick Tunnel URL is temporary. After stopping or restarting the script, the previous `trycloudflare.com` address may no longer work. Start the script again and use the new URL it prints.
+
+Do **not** run `npm start` at the same time as `start-free-public-test.sh`, because both try to use port 3000 and the public-test script already starts the Node server.
+
+### Local-only WSL test
+
+If a local `.env` file is already configured and you only want to open the café on the Windows computer:
+
+```bash
+cd ~/Security-engineering-projects/secure-lofi-study-cafe
+npm start
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+If port 3000 is already in use, stop the old café process with `Ctrl+C` before starting another copy.
 
 ## Hosting command
 
